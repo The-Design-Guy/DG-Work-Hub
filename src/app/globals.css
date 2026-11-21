@@ -50,3 +50,78 @@ h4 {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Layout + cards                                                       */
+/* ------------------------------------------------------------------ */
+
+.card-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15.5rem), 1fr));
+}
+@media (min-width: 640px) {
+  .card-grid {
+    gap: 1.25rem;
+  }
+}
+
+.card {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+.card:hover {
+  border-color: #4a505a;
+  background: #1f2328;
+  transform: translateY(-2px);
+}
+.card:focus-within {
+  border-color: var(--color-accent);
+}
+/* Bookmarks marked for Launch Workspace get a quiet yellow edge. */
+.card-launch {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-line));
+}
+
+/* Whole card is clickable via its main link; buttons sit above it (z-10). */
+.stretched-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.section-title {
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Phones: folders go two-up so more fit on screen. */
+@media (max-width: 639px) {
+  .card-grid-folders {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+}

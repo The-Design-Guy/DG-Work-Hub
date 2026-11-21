@@ -1,0 +1,130 @@
+"use client";
+
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { Download, FolderPlus, LogOut, Plus, Search, Trash2, Upload } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
+import type { BookmarkView } from "@/lib/types";
+import { Button, buttonClass } from "./ui/button";
+import { Menu, MenuItem, MenuSeparator } from "./ui/menu";
+import { AddBookmarkDialog, NewFolderDialog } from "./dialogs";
+
+export function TopBar({
+  user,
+  pinned,
+}: {
+  user: { name: string; email: string; image?: string | null };
+  pinned: BookmarkView[];
+}) {
+  const router = useRouter();
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [newFolder, setNewFolder] = useState(false);
+  const [addBookmark, setAddBookmark] = useState(false);
+
+  // "/" or Ctrl/Cmd+K focuses search.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const typing = (e.target as HTMLElement)?.closest("input, textarea, [contenteditable]");
+      if ((e.key === "k" && (e.metaKey || e.ctrlKey)) || (e.key === "/" && !typing)) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  return (
+    <header className="sticky top-0 z-40 border-b border-line/70 bg-bg/85 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap sm:gap-4 sm:px-8">
+        <Link href="/" className="flex shrink-0 items-center gap-2.5 rounded-xl pr-1" aria-label="DG Work Hub — home">
+          <Image src="/brand/dg-head.svg" alt="" width={36} height={36} priority />
+          <span className="hidden font-heading text-lg font-semibold tracking-tight md:inline">Work Hub</span>
+        </Link>
+
+        <div className="relative order-last w-full sm:order-none sm:max-w-xl sm:flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-muted" aria-hidden />
+          <input
+            ref={searchRef}
+            type="search"
+            placeholder="Search folders and links"
+            aria-label="Search folders and links"
+            className="h-11 w-full rounded-xl border border-line bg-surface pl-10 pr-14 text-sm placeholder:text-muted focus:border-accent focus:outline-none"
+          />
+          <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted sm:block">
+            Ctrl K
+          </kbd>
+        </div>
+
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="secondary" size="md" onClick={() => setNewFolder(true)} aria-label="New folder">
+            <FolderPlus className="h-4.5 w-4.5" />
+            <span className="hidden lg:inline">New Folder</span>
+          </Button>
+          <Button variant="primary" size="md" onClick={() => setAddBookmark(true)} aria-label="Add bookmark">
+            <Plus className="h-4.5 w-4.5" />
+            <span className="hidden sm:inline">Add Bookmark</span>
+          </Button>
+          <Menu
+            trigger={
+              <button
+                type="button"
+                aria-label="Account menu"
+                className="grid h-11 w-11 place-items-center overflow-hidden rounded-xl border border-line bg-surface"
+              >
+                {user.image ? (
+                  <Image src={user.image} alt="" width={44} height={44} unoptimized />
+                ) : (
+                  <span className="font-heading font-semibold">{user.name.charAt(0)}</span>
+                )}
+              </button>
+            }
+          >
+            <div className="px-3 py-2 text-xs text-muted">{user.email}</div>
+            <MenuSeparator />
+            <MenuItem icon={<Upload />}>Import Chrome bookmarks</MenuItem>
+            <MenuItem icon={<Download />}>Export (HTML / JSON)</MenuItem>
+            <MenuItem icon={<Trash2 />}>Trash</MenuItem>
+            <MenuSeparator />
+            <MenuItem
+              icon={<LogOut />}
+              onSelect={async () => {
+                await authClient.signOut();
+                router.replace("/login");
+              }}
+            >
+              Sign out
+            </MenuItem>
+          </Menu>
+        </div>
+      </div>
+
+      {pinned.length > 0 && (
+        <nav aria-label="Pinned links" className="mx-auto max-w-[1440px] px-4 pb-3 sm:px-8">
+          <ul className="flex gap-2 overflow-x-auto [scrollbar-width:none]">
+            {pinned.map((p) => (
+              <li key={p.id} className="shrink-0">
+                <a
+                  href={p.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={buttonClass("ghost", "sm", "border border-line/70 bg-surface/60 text-text/90")}
+                >
+                  <span className="grid h-5 w-5 place-items-center rounded-md bg-elevated text-[11px] font-semibold">
+                    {p.title.charAt(0)}
+                  </span>
+                  {p.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
+
+      <NewFolderDialog open={newFolder} onOpenChange={setNewFolder} />
+      <AddBookmarkDialog open={addBookmark} onOpenChange={setAddBookmark} />
+    </header>
+  );
+}
