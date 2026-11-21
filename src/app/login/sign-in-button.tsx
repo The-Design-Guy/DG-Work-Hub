@@ -12,7 +12,7 @@ export function SignInButton() {
     setError(null);
     const res = await authClient.signIn.social({ provider: "github", callbackURL: "/" });
     if (res?.error) {
-      setError("Sign-in failed. This app is private.");
+      setError(`Sign-in failed: ${res.error.message ?? res.error.statusText ?? "unknown error"}`);
       setPending(false);
     }
   }
