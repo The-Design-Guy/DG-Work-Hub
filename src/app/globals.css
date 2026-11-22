@@ -125,3 +125,42 @@ h4 {
     gap: 0.75rem;
   }
 }
+
+/* Organize screen (in a layer so utilities like max-lg:hidden can override) */
+@layer components {
+.pane {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  min-height: 0;
+}
+.pane-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid var(--color-line);
+  font-family: var(--font-heading);
+  font-weight: 600;
+}
+.pane-body {
+  padding: 0.5rem;
+  overflow: auto;
+  max-height: calc(100dvh - 17rem);
+  min-height: 20rem;
+}
+.drop-line {
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-accent);
+  pointer-events: none;
+}
+}

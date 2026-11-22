@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Folder as FolderIcon, FolderPlus, Plus, Rocket } from "lucide-react";
+import Link from "next/link";
+import { Folder as FolderIcon, FolderPlus, FolderTree, Plus, Rocket } from "lucide-react";
 import { setLaunch } from "@/app/actions/bookmarks";
 import type { BookmarkView, FolderView } from "@/lib/types";
 import { BookmarkCard, FolderCard } from "./cards";
-import { Button } from "./ui/button";
+import { Button, buttonClass } from "./ui/button";
 import { EmptyState } from "./empty-state";
 
 const later = (what: string) => toast(`${what} is connected in an upcoming step.`);
@@ -95,6 +96,10 @@ export function FolderContents({
             </p>
           </div>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+        <Link href={`/organize?focus=${folder.id}`} className={buttonClass("secondary", "md", "h-12")}>
+          <FolderTree className="h-4.5 w-4.5" /> Organize
+        </Link>
         {launchCount > 0 && (
           <Button variant="primary" className="h-12 px-5 text-base" onClick={() => later("Launch Workspace")}>
             <Rocket className="h-5 w-5" />
@@ -102,6 +107,7 @@ export function FolderContents({
             <span className="rounded-md bg-black/15 px-1.5 text-sm">{launchCount}</span>
           </Button>
         )}
+        </div>
       </div>
 
       {subfolders.length > 0 && (

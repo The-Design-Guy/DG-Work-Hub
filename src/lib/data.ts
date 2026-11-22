@@ -116,3 +116,20 @@ export async function getExistingUrls(ownerId: string) {
     .where(and(eq(bookmark.ownerId, ownerId), isNull(bookmark.deletedAt)));
   return rows.map((r) => r.url);
 }
+
+/** Whole collection (minus Trash) for the Organize screen. */
+export async function getFullTree(ownerId: string) {
+  const [folders, bookmarks] = await Promise.all([
+    db
+      .select({ id: folder.id, parentId: folder.parentId, name: folder.name, isProject: folder.isProject })
+      .from(folder)
+      .where(and(eq(folder.ownerId, ownerId), isNull(folder.deletedAt)))
+      .orderBy(asc(folder.sortOrder), asc(folder.createdAt)),
+    db
+      .select({ id: bookmark.id, folderId: bookmark.folderId, title: bookmark.title, domain: bookmark.domain, faviconUrl: bookmark.faviconUrl })
+      .from(bookmark)
+      .where(and(eq(bookmark.ownerId, ownerId), isNull(bookmark.deletedAt)))
+      .orderBy(asc(bookmark.sortOrder), asc(bookmark.createdAt)),
+  ]);
+  return { folders, bookmarks };
+}

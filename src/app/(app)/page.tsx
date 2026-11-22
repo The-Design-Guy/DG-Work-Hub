@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Upload } from "lucide-react";
+import { FolderTree, Upload } from "lucide-react";
 import { BookmarkGrid, FolderGrid } from "@/components/folder-contents";
 import { EmptyState } from "@/components/empty-state";
 import { buttonClass } from "@/components/ui/button";
@@ -28,7 +28,13 @@ export default async function Home() {
   return (
     <>
       <section aria-labelledby="projects-h">
-        <h1 id="projects-h" className="text-3xl font-bold tracking-tight sm:text-4xl">Projects</h1>
+        <div className="flex items-start justify-between gap-4">
+          <h1 id="projects-h" className="text-3xl font-bold tracking-tight sm:text-4xl">Projects</h1>
+          <Link href="/organize" className={buttonClass("secondary", "md")}>
+            <FolderTree className="h-4.5 w-4.5" />
+            Organize
+          </Link>
+        </div>
         <p className="mt-1 text-sm text-muted">
           {projects.length
             ? `${projects.length} ${projects.length === 1 ? "project" : "projects"}`

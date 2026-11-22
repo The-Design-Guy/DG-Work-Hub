@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Download, Home, LogOut, Puzzle, Trash2, Upload, X } from "lucide-react";
+import { Download, FolderTree, Home, LogOut, Puzzle, Trash2, Upload, X } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "./ui/button";
 
@@ -52,6 +52,7 @@ export function NavMenu({ email }: { email: string }) {
 
   const items: Item[] = [
     { label: "Home", icon: <Home />, href: "/" },
+    { label: "Organize", icon: <FolderTree />, href: "/organize" },
     { label: "Import Chrome bookmarks", icon: <Upload />, href: "/import" },
     { label: "Export (HTML / JSON)", icon: <Download />, soon: true },
     { label: "Trash", icon: <Trash2 />, soon: true },
