@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { removeFolderCover, setFolderCover, setProject, subfoldersToProjects, unpackFolder } from "@/app/actions/folders";
+import { restoreBatch, trashBookmark, trashFolder } from "@/app/actions/trash";
 import { Dialog } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { resizeImage } from "@/lib/resize-image";
@@ -42,6 +43,20 @@ const menuTrigger = (label: string) => (
     <MoreHorizontal className="h-5 w-5" />
   </button>
 );
+
+function undoToast(message: string, batch: string) {
+  toast(message, {
+    duration: 8000,
+    action: {
+      label: "Undo",
+      onClick: async () => {
+        const res = await restoreBatch(batch);
+        if (res.ok) toast.success("Restored");
+        else toast.error("Couldn't restore. Check Trash.");
+      },
+    },
+  });
+}
 
 function Favicon({ src, letter }: { src: string | null; letter: string }) {
   const [failed, setFailed] = useState(false);
@@ -128,6 +143,24 @@ export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?
     });
   }
 
+  function askDelete() {
+    const inside = [
+      folder.subfolderCount ? n(folder.subfolderCount, "subfolder", "subfolders") : null,
+      folder.bookmarkCount ? n(folder.bookmarkCount, "link", "links") : null,
+    ].filter(Boolean);
+    setConfirm({
+      title: `Move “${folder.name}” to Trash?`,
+      text: `${inside.length ? `Everything inside goes with it (${inside.join(", ")}, plus anything in subfolders). ` : ""}You can restore it from Trash.`,
+      cta: "Move to Trash",
+      run: async () => {
+        const res = await trashFolder(folder.id);
+        if (!res.ok) return "Couldn't delete the folder.";
+        undoToast(`“${folder.name}” moved to Trash`, res.batch);
+        return null;
+      },
+    });
+  }
+
   async function toggleProject(value: boolean) {
     const res = await setProject(folder.id, value);
     if (!res.ok) return toast.error("Couldn't update the folder.");
@@ -190,7 +223,7 @@ export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?
               <MenuItem icon={<FolderOutput />} onSelect={askUnpack}>{unpackLabel}</MenuItem>
             )}
             <MenuSeparator />
-            <MenuItem icon={<Trash2 />} danger onSelect={() => onAction?.("delete")}>Move to Trash</MenuItem>
+            <MenuItem icon={<Trash2 />} danger onSelect={askDelete}>Move to Trash</MenuItem>
           </Menu>
         </div>
         <Dialog
@@ -231,7 +264,7 @@ export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?
       </div>
 
       <div className="flex flex-1 flex-col p-3.5 sm:p-5">
-        <h3 className="truncate text-base font-semibold sm:text-lg">
+        <h3 className="line-clamp-2 break-words text-base font-semibold leading-snug sm:text-lg">
           <Link href={`/f/${folder.id}`} dir="auto" className="stretched-link focus-visible:outline-none">
             {folder.name}
           </Link>
@@ -323,7 +356,17 @@ export function BookmarkCard({
               <MenuItem icon={<Pencil />} onSelect={() => onAction?.("edit")}>Edit</MenuItem>
               <MenuItem icon={<ArrowRightLeft />} onSelect={() => onAction?.("move")}>Move / reorder</MenuItem>
               <MenuSeparator />
-              <MenuItem icon={<Trash2 />} danger onSelect={() => onAction?.("delete")}>Move to Trash</MenuItem>
+              <MenuItem
+                icon={<Trash2 />}
+                danger
+                onSelect={async () => {
+                  const res = await trashBookmark(bookmark.id);
+                  if (!res.ok) return toast.error("Couldn't delete the link.");
+                  undoToast(`“${bookmark.title}” moved to Trash`, res.batch);
+                }}
+              >
+                Move to Trash
+              </MenuItem>
             </Menu>
           </div>
         </div>
@@ -331,7 +374,7 @@ export function BookmarkCard({
 
       {/* Body */}
       <div className="flex flex-1 flex-col p-4">
-        <h3 className="truncate font-semibold">
+        <h3 className="line-clamp-2 break-words font-semibold leading-snug">
           <a
             href={bookmark.url}
             target="_blank"

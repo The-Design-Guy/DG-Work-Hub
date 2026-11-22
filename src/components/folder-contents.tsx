@@ -88,7 +88,7 @@ export function FolderContents({
             )}
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-3xl font-bold tracking-tight sm:text-4xl">{folder.name}</h1>
+            <h1 dir="auto" className="line-clamp-2 break-words text-left text-3xl font-bold leading-tight tracking-tight sm:text-4xl">{folder.name}</h1>
             <p className="mt-1 text-sm text-muted">
               {bookmarks.length} {bookmarks.length === 1 ? "link" : "links"}
               {subfolders.length > 0 && ` · ${subfolders.length} ${subfolders.length === 1 ? "folder" : "folders"}`}

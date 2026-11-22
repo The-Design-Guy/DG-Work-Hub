@@ -133,3 +133,53 @@ export async function getFullTree(ownerId: string) {
   ]);
   return { folders, bookmarks };
 }
+
+export type TrashBatch = {
+  batch: string;
+  deletedAt: string;
+  top: { type: "f" | "b"; name: string }[];
+  folders: number;
+  links: number;
+};
+
+/** Trash, grouped by what was deleted together (one row per delete / undone import). */
+export async function getTrash(ownerId: string): Promise<TrashBatch[]> {
+  const rowsOf = <T,>(r: unknown): T[] => (r && typeof r === "object" && "rows" in r ? (r as { rows: T[] }).rows : (r as T[]));
+  const [topRes, countRes] = await Promise.all([
+    db.execute(sql`
+      select 'f' as type, f.name as name, f.delete_batch_id as batch, f.deleted_at as deleted_at
+      from ${folder} f left join ${folder} p on p.id = f.parent_id
+      where f.owner_id = ${ownerId} and f.deleted_at is not null and f.delete_batch_id is not null
+        and (p.id is null or p.delete_batch_id is distinct from f.delete_batch_id)
+      union all
+      select 'b', b.title, b.delete_batch_id, b.deleted_at
+      from ${bookmark} b left join ${folder} p on p.id = b.folder_id
+      where b.owner_id = ${ownerId} and b.deleted_at is not null and b.delete_batch_id is not null
+        and (p.id is null or p.delete_batch_id is distinct from b.delete_batch_id)
+      order by deleted_at desc`),
+    db.execute(sql`
+      select batch, sum(fc)::int as folders, sum(bc)::int as links from (
+        select delete_batch_id as batch, 1 as fc, 0 as bc from ${folder} where owner_id = ${ownerId} and deleted_at is not null
+        union all
+        select delete_batch_id, 0, 1 from ${bookmark} where owner_id = ${ownerId} and deleted_at is not null
+      ) x where batch is not null group by batch`),
+  ]);
+  const counts = new Map(rowsOf<{ batch: string; folders: number; links: number }>(countRes).map((r) => [r.batch, r]));
+  const map = new Map<string, TrashBatch>();
+  for (const r of rowsOf<{ type: "f" | "b"; name: string; batch: string; deleted_at: string | Date }>(topRes)) {
+    let b = map.get(r.batch);
+    if (!b) {
+      const c = counts.get(r.batch);
+      b = {
+        batch: r.batch,
+        deletedAt: new Date(r.deleted_at).toISOString(),
+        top: [],
+        folders: Number(c?.folders ?? 0),
+        links: Number(c?.links ?? 0),
+      };
+      map.set(r.batch, b);
+    }
+    b.top.push({ type: r.type, name: r.name });
+  }
+  return [...map.values()].slice(0, 300);
+}

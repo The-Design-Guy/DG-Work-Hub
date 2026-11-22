@@ -55,7 +55,7 @@ export function NavMenu({ email }: { email: string }) {
     { label: "Organize", icon: <FolderTree />, href: "/organize" },
     { label: "Import Chrome bookmarks", icon: <Upload />, href: "/import" },
     { label: "Export (HTML / JSON)", icon: <Download />, soon: true },
-    { label: "Trash", icon: <Trash2 />, soon: true },
+    { label: "Trash", icon: <Trash2 />, href: "/trash" },
     { label: "Chrome extension", icon: <Puzzle />, soon: true },
   ];
 
