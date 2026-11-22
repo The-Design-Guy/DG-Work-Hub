@@ -102,8 +102,10 @@ export const folder = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     deleteBatchId: uuid("delete_batch_id"),
+    importId: uuid("import_id"),
   },
   (t) => [
+    index("folder_import_idx").on(t.importId),
     index("folder_owner_parent_idx").on(t.ownerId, t.parentId, t.sortOrder),
     index("folder_owner_deleted_idx").on(t.ownerId, t.deletedAt),
     index("folder_batch_idx").on(t.deleteBatchId),
@@ -131,8 +133,10 @@ export const bookmark = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     deleteBatchId: uuid("delete_batch_id"),
+    importId: uuid("import_id"),
   },
   (t) => [
+    index("bookmark_import_idx").on(t.importId),
     index("bookmark_owner_folder_idx").on(t.ownerId, t.folderId, t.sortOrder),
     index("bookmark_owner_deleted_idx").on(t.ownerId, t.deletedAt),
     index("bookmark_owner_url_idx").on(t.ownerId, t.url),

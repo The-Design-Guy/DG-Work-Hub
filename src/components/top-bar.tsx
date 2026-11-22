@@ -2,13 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Download, FolderPlus, LogOut, Plus, Search, Trash2, Upload } from "lucide-react";
-import { authClient } from "@/lib/auth-client";
+import { FolderPlus, Plus, Search } from "lucide-react";
 import type { BookmarkView } from "@/lib/types";
 import { Button, buttonClass } from "./ui/button";
-import { Menu, MenuItem, MenuSeparator } from "./ui/menu";
+import { NavMenu } from "./nav-menu";
 import { AddBookmarkDialog, NewFolderDialog } from "./dialogs";
 
 export function TopBar({
@@ -18,7 +16,6 @@ export function TopBar({
   user: { name: string; email: string; image?: string | null };
   pinned: BookmarkView[];
 }) {
-  const router = useRouter();
   const searchRef = useRef<HTMLInputElement>(null);
   const [newFolder, setNewFolder] = useState(false);
   const [addBookmark, setAddBookmark] = useState(false);
@@ -83,37 +80,7 @@ export function TopBar({
             <Plus className="h-4.5 w-4.5" />
             <span className="hidden sm:inline">Add Bookmark</span>
           </Button>
-          <Menu
-            trigger={
-              <button
-                type="button"
-                aria-label="Account menu"
-                className="grid h-11 w-11 place-items-center overflow-hidden rounded-xl border border-line bg-surface"
-              >
-                {user.image ? (
-                  <Image src={user.image} alt="" width={44} height={44} unoptimized />
-                ) : (
-                  <span className="font-heading font-semibold">{user.name.charAt(0)}</span>
-                )}
-              </button>
-            }
-          >
-            <div className="px-3 py-2 text-xs text-muted">{user.email}</div>
-            <MenuSeparator />
-            <MenuItem icon={<Upload />}>Import Chrome bookmarks</MenuItem>
-            <MenuItem icon={<Download />}>Export (HTML / JSON)</MenuItem>
-            <MenuItem icon={<Trash2 />}>Trash</MenuItem>
-            <MenuSeparator />
-            <MenuItem
-              icon={<LogOut />}
-              onSelect={async () => {
-                await authClient.signOut();
-                router.replace("/login");
-              }}
-            >
-              Sign out
-            </MenuItem>
-          </Menu>
+          <NavMenu email={user.email} />
         </div>
       </div>
 

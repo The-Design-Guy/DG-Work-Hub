@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import {
   ArrowRightLeft,
   Copy,
@@ -31,6 +32,13 @@ const menuTrigger = (label: string) => (
     <MoreHorizontal className="h-5 w-5" />
   </button>
 );
+
+function Favicon({ src, letter }: { src: string | null; letter: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) return <>{letter}</>;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt="" className="h-9 w-9 [image-rendering:auto]" onError={() => setFailed(true)} />;
+}
 
 /* ------------------------------------------------------------------ */
 
@@ -103,12 +111,7 @@ export function BookmarkCard({
         ) : (
           <div className="grid h-full place-items-center">
             <div className="grid h-16 w-16 place-items-center rounded-2xl bg-white/8 font-heading text-3xl font-semibold text-white/90 ring-1 ring-white/10 backdrop-blur">
-              {bookmark.faviconUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={bookmark.faviconUrl} alt="" className="h-9 w-9" />
-              ) : (
-                letter
-              )}
+              <Favicon src={bookmark.faviconUrl} letter={letter} />
             </div>
           </div>
         )}

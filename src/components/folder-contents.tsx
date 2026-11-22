@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { FolderPlus, Plus, Rocket } from "lucide-react";
+import { Folder as FolderIcon, FolderPlus, Plus, Rocket } from "lucide-react";
+import { setLaunch } from "@/app/actions/bookmarks";
 import type { BookmarkView, FolderView } from "@/lib/types";
 import { BookmarkCard, FolderCard } from "./cards";
 import { Button } from "./ui/button";
@@ -20,6 +21,41 @@ export function FolderGrid({ folders }: { folders: FolderView[] }) {
   );
 }
 
+function useLaunchToggle(initial: BookmarkView[]) {
+  const [bookmarks, setBookmarks] = useState(initial);
+  async function toggle(id: string, next: boolean) {
+    setBookmarks((list) => list.map((b) => (b.id === id ? { ...b, launchOnStart: next } : b)));
+    const res = await setLaunch(id, next);
+    if (!res.ok) {
+      setBookmarks((list) => list.map((b) => (b.id === id ? { ...b, launchOnStart: !next } : b)));
+      toast.error("Couldn't save. Try again.");
+      return;
+    }
+    toast(next ? "Added to Launch Workspace" : "Removed from Launch Workspace");
+  }
+  return { bookmarks, toggle };
+}
+
+function Cards({ bookmarks, toggle }: { bookmarks: BookmarkView[]; toggle: (id: string, next: boolean) => void }) {
+  return (
+    <div className="card-grid">
+      {bookmarks.map((b) => (
+        <BookmarkCard
+          key={b.id}
+          bookmark={b}
+          onToggleLaunch={toggle}
+          onAction={(a) => later(a === "delete" ? "Trash" : a[0].toUpperCase() + a.slice(1))}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function BookmarkGrid({ bookmarks: initial }: { bookmarks: BookmarkView[] }) {
+  const { bookmarks, toggle } = useLaunchToggle(initial);
+  return <Cards bookmarks={bookmarks} toggle={toggle} />;
+}
+
 export function FolderContents({
   folder,
   subfolders,
@@ -29,20 +65,15 @@ export function FolderContents({
   subfolders: FolderView[];
   bookmarks: BookmarkView[];
 }) {
-  const [bookmarks, setBookmarks] = useState(initial);
+  const { bookmarks, toggle } = useLaunchToggle(initial);
   const launchCount = bookmarks.filter((b) => b.launchOnStart).length;
-
-  function toggle(id: string, next: boolean) {
-    setBookmarks((list) => list.map((b) => (b.id === id ? { ...b, launchOnStart: next } : b)));
-    toast(next ? "Added to Launch Workspace" : "Removed from Launch Workspace");
-  }
 
   return (
     <>
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
           <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-surface text-4xl" aria-hidden>
-            {folder.icon}
+            {folder.icon ?? <FolderIcon className="h-8 w-8 text-accent" />}
           </div>
           <div className="min-w-0">
             <h1 className="truncate text-3xl font-bold tracking-tight sm:text-4xl">{folder.name}</h1>
@@ -72,16 +103,7 @@ export function FolderContents({
       <section className="mt-10" aria-labelledby="links-h">
         <h2 id="links-h" className="section-title">Links</h2>
         {bookmarks.length ? (
-          <div className="card-grid">
-            {bookmarks.map((b) => (
-              <BookmarkCard
-                key={b.id}
-                bookmark={b}
-                onToggleLaunch={toggle}
-                onAction={(a) => later(a === "delete" ? "Trash" : a[0].toUpperCase() + a.slice(1))}
-              />
-            ))}
-          </div>
+          <Cards bookmarks={bookmarks} toggle={toggle} />
         ) : (
           <EmptyState
             title="No links here yet"
