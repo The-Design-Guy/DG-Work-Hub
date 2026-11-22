@@ -1,0 +1,2 @@
+ALTER TABLE "folder" ADD COLUMN "icon_image_id" uuid;--> statement-breakpoint
+ALTER TABLE "folder" ADD CONSTRAINT "folder_icon_image_id_image_id_fk" FOREIGN KEY ("icon_image_id") REFERENCES "public"."image"("id") ON DELETE set null ON UPDATE no action;

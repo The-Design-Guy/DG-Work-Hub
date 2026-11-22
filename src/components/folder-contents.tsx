@@ -80,9 +80,9 @@ export function FolderContents({
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
           <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-surface text-4xl" aria-hidden>
-            {folder.coverUrl ? (
+            {folder.iconUrl || folder.coverUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={folder.coverUrl} alt="" className="h-full w-full object-cover" />
+              <img src={(folder.iconUrl ?? folder.coverUrl)!} alt="" className="h-full w-full object-cover" />
             ) : (
               (folder.icon ?? <FolderIcon className="h-8 w-8 text-accent" />)
             )}

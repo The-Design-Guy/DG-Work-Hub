@@ -127,6 +127,8 @@ export const folder = pgTable(
     /** Top-level folders flagged as projects show in Home's "Projects" section. */
     isProject: boolean("is_project").notNull().default(false),
     coverImageId: uuid("cover_image_id").references(() => image.id, { onDelete: "set null" }),
+    /** Square icon (a site's favicon or an uploaded image, cropped 1:1). */
+    iconImageId: uuid("icon_image_id").references(() => image.id, { onDelete: "set null" }),
     sortOrder: doublePrecision("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { removeFolderCover, setFolderCover, setProject, subfoldersToProjects, unpackFolder } from "@/app/actions/folders";
 import { restoreBatch, trashBookmark, trashFolder } from "@/app/actions/trash";
 import { Dialog } from "./ui/dialog";
+import { IconDialog } from "./icon-dialog";
 import { Button } from "./ui/button";
 import { resizeImage } from "@/lib/resize-image";
 import {
@@ -14,6 +15,7 @@ import {
   Folder as FolderIcon,
   Image as ImageIcon,
   ImageOff,
+  SquareUser,
   FolderOutput,
   Briefcase,
   Library,
@@ -70,6 +72,13 @@ function Favicon({ src, letter }: { src: string | null; letter: string }) {
 export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?: (a: string) => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [cover, setCover] = useState(folder.coverUrl);
+  const [iconUrl, setIconUrl] = useState(folder.iconUrl);
+  const [iconOpen, setIconOpen] = useState(false);
+  const [prevIcon, setPrevIcon] = useState(folder.iconUrl);
+  if (folder.iconUrl !== prevIcon) {
+    setPrevIcon(folder.iconUrl);
+    setIconUrl(folder.iconUrl);
+  }
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<null | {
     title: string;
@@ -186,17 +195,37 @@ export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?
         }}
       >
         {cover ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={cover} alt="" className={cn("h-full w-full object-cover transition-opacity", busy && "opacity-60")} />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={cover} alt="" className={cn("h-full w-full object-cover transition-opacity", busy && "opacity-60")} />
+            {(iconUrl || folder.icon) && (
+              <div className="absolute bottom-2.5 left-2.5 grid h-11 w-11 place-items-center overflow-hidden rounded-xl bg-elevated text-2xl shadow-lg shadow-black/40 ring-2 ring-surface sm:h-12 sm:w-12" aria-hidden>
+                {iconUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={iconUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  folder.icon
+                )}
+              </div>
+            )}
+          </>
         ) : (
           <div className="grid h-full place-items-center">
-            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/6 text-3xl ring-1 ring-white/10 sm:h-16 sm:w-16 sm:text-4xl" aria-hidden>
-              {folder.icon ?? <FolderIcon className="h-7 w-7 text-accent sm:h-8 sm:w-8" />}
+            <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-2xl bg-white/6 text-3xl ring-1 ring-white/10 sm:h-16 sm:w-16 sm:text-4xl" aria-hidden>
+              {iconUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={iconUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                (folder.icon ?? <FolderIcon className="h-7 w-7 text-accent sm:h-8 sm:w-8" />)
+              )}
             </div>
           </div>
         )}
         <div className="absolute right-2 top-2 z-10 rounded-lg bg-black/45 backdrop-blur">
           <Menu trigger={menuTrigger(`Actions for ${folder.name}`)}>
+            <MenuItem icon={<SquareUser />} onSelect={() => setIconOpen(true)}>
+              {iconUrl ? "Change icon" : "Choose icon"}
+            </MenuItem>
             <MenuItem icon={<ImageIcon />} onSelect={() => fileRef.current?.click()}>
               {cover ? "Change cover image" : "Add cover image"}
             </MenuItem>
@@ -226,6 +255,14 @@ export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?
             <MenuItem icon={<Trash2 />} danger onSelect={askDelete}>Move to Trash</MenuItem>
           </Menu>
         </div>
+        <IconDialog
+          open={iconOpen}
+          onOpenChange={setIconOpen}
+          folderId={folder.id}
+          folderName={folder.name}
+          hasIcon={!!iconUrl}
+          onPreview={setIconUrl}
+        />
         <Dialog
           open={!!confirm}
           onOpenChange={(o) => !o && !running && setConfirm(null)}
