@@ -290,7 +290,7 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
               >
                 {h === "before" && <span className="drop-line top-0" />}
                 {h === "after" && <span className="drop-line bottom-0" />}
-                {editable && <GripVertical className="h-4 w-4 shrink-0 text-muted/50" aria-hidden />}
+                {editable && <GripVertical className="h-5 w-5 shrink-0 text-muted group-hover:text-accent" aria-hidden />}
                 <button
                   type="button"
                   aria-label={isOpen ? `Collapse ${f.name}` : `Expand ${f.name}`}
@@ -336,7 +336,7 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
               >
                 {h === "before" && <span className="drop-line top-0" />}
                 {h === "after" && <span className="drop-line bottom-0" />}
-                {editable && <GripVertical className="h-4 w-4 shrink-0 text-muted/50" aria-hidden />}
+                {editable && <GripVertical className="h-5 w-5 shrink-0 text-muted group-hover:text-accent" aria-hidden />}
                 <span className="w-6 shrink-0" />
                 {b.faviconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
