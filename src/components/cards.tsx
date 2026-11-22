@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { removeFolderCover, setFolderCover } from "@/app/actions/folders";
+import { removeFolderCover, setFolderCover, unpackFolder } from "@/app/actions/folders";
+import { Dialog } from "./ui/dialog";
+import { Button } from "./ui/button";
 import { resizeImage } from "@/lib/resize-image";
 import {
   ArrowRightLeft,
@@ -11,6 +13,7 @@ import {
   Folder as FolderIcon,
   Image as ImageIcon,
   ImageOff,
+  FolderOutput,
   MoreHorizontal,
   Pencil,
   Rocket,
@@ -50,6 +53,8 @@ export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?
   const fileRef = useRef<HTMLInputElement>(null);
   const [cover, setCover] = useState(folder.coverUrl);
   const [busy, setBusy] = useState(false);
+  const [unpackOpen, setUnpackOpen] = useState(false);
+  const [unpacking, setUnpacking] = useState(false);
   const [prevUrl, setPrevUrl] = useState(folder.coverUrl);
   if (folder.coverUrl !== prevUrl) {
     setPrevUrl(folder.coverUrl);
@@ -81,6 +86,17 @@ export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?
     } finally {
       setBusy(false);
     }
+  }
+
+  const unpackLabel = folder.parentId ? "Move contents up one level" : "Move contents to Home";
+
+  async function unpack() {
+    setUnpacking(true);
+    const res = await unpackFolder(folder.id);
+    setUnpacking(false);
+    setUnpackOpen(false);
+    if (!res.ok) return toast.error(res.error);
+    toast.success(`Moved ${res.folders} folders and ${res.bookmarks} links. “${folder.name}” is in Trash.`);
   }
 
   async function removeCover() {
@@ -124,10 +140,26 @@ export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?
             <MenuSeparator />
             <MenuItem icon={<Pencil />} onSelect={() => onAction?.("rename")}>Rename</MenuItem>
             <MenuItem icon={<ArrowRightLeft />} onSelect={() => onAction?.("move")}>Move / reorder</MenuItem>
+            {(folder.bookmarkCount > 0 || folder.subfolderCount > 0) && (
+              <MenuItem icon={<FolderOutput />} onSelect={() => setUnpackOpen(true)}>{unpackLabel}</MenuItem>
+            )}
             <MenuSeparator />
             <MenuItem icon={<Trash2 />} danger onSelect={() => onAction?.("delete")}>Move to Trash</MenuItem>
           </Menu>
         </div>
+        <Dialog
+          open={unpackOpen}
+          onOpenChange={setUnpackOpen}
+          title={`${unpackLabel}?`}
+          description={`${folder.subfolderCount} ${folder.subfolderCount === 1 ? "folder" : "folders"} and ${folder.bookmarkCount} ${folder.bookmarkCount === 1 ? "link" : "links"} move out of “${folder.name}”. Subfolders keep everything inside them. The empty “${folder.name}” folder goes to Trash.`}
+        >
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setUnpackOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={unpack} disabled={unpacking}>
+              {unpacking ? "Moving…" : "Move contents"}
+            </Button>
+          </div>
+        </Dialog>
         <input
           ref={fileRef}
           type="file"

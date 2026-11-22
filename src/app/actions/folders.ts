@@ -1,7 +1,8 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { atomic, db, schema } from "@/db";
 import { requireUser } from "@/lib/session";
@@ -69,4 +70,68 @@ export async function removeFolderCover(folderId: string) {
   }
   revalidatePath("/", "layout");
   return { ok: true as const };
+}
+
+/**
+ * "Unpack": moves a folder's direct contents (subfolders keep their own contents)
+ * up into its parent, or Home, keeping their order, then moves the now-empty
+ * folder to Trash.
+ */
+export async function unpackFolder(folderId: string) {
+  const user = await requireUser();
+  if (!z.uuid().safeParse(folderId).success) return { ok: false as const, error: "Folder not found." };
+  const [f] = await db
+    .select({ id: folder.id, parentId: folder.parentId })
+    .from(folder)
+    .where(and(eq(folder.id, folderId), eq(folder.ownerId, user.id), isNull(folder.deletedAt)));
+  if (!f) return { ok: false as const, error: "Folder not found." };
+
+  const target = f.parentId;
+  const inTarget = (col: typeof folder.parentId | typeof schema.bookmark.folderId) =>
+    target ? sql`${col} = ${target}` : sql`${col} is null`;
+  const { bookmark } = schema;
+
+  const [fb] = await db
+    .select({ m: sql<number>`coalesce(max(${folder.sortOrder}), 0)` })
+    .from(folder)
+    .where(and(eq(folder.ownerId, user.id), inTarget(folder.parentId)));
+  const [bb] = await db
+    .select({ m: sql<number>`coalesce(max(${bookmark.sortOrder}), 0)` })
+    .from(bookmark)
+    .where(and(eq(bookmark.ownerId, user.id), inTarget(bookmark.folderId)));
+  const fBase = Number(fb?.m ?? 0);
+  const bBase = Number(bb?.m ?? 0);
+  const now = new Date();
+
+  const kidsF = await db
+    .select({ id: folder.id })
+    .from(folder)
+    .where(and(eq(folder.parentId, folderId), eq(folder.ownerId, user.id), isNull(folder.deletedAt)))
+    .orderBy(folder.sortOrder, folder.createdAt);
+  const kidsB = await db
+    .select({ id: bookmark.id })
+    .from(bookmark)
+    .where(and(eq(bookmark.folderId, folderId), eq(bookmark.ownerId, user.id), isNull(bookmark.deletedAt)))
+    .orderBy(bookmark.sortOrder, bookmark.createdAt);
+
+  await atomic([
+    ...kidsF.map((k, i) =>
+      db
+        .update(folder)
+        .set({ parentId: target, sortOrder: fBase + i + 1, updatedAt: now })
+        .where(and(eq(folder.id, k.id), eq(folder.ownerId, user.id))),
+    ),
+    ...kidsB.map((k, i) =>
+      db
+        .update(bookmark)
+        .set({ folderId: target, sortOrder: bBase + i + 1, updatedAt: now })
+        .where(and(eq(bookmark.id, k.id), eq(bookmark.ownerId, user.id))),
+    ),
+    db
+      .update(folder)
+      .set({ deletedAt: now, deleteBatchId: randomUUID(), updatedAt: now })
+      .where(and(eq(folder.id, folderId), eq(folder.ownerId, user.id))),
+  ]);
+  revalidatePath("/", "layout");
+  return { ok: true as const, target, folders: kidsF.length, bookmarks: kidsB.length };
 }
