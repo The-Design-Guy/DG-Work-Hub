@@ -1,12 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { removeFolderCover, setFolderCover } from "@/app/actions/folders";
+import { resizeImage } from "@/lib/resize-image";
 import {
   ArrowRightLeft,
   Copy,
   ExternalLink,
   Folder as FolderIcon,
+  Image as ImageIcon,
+  ImageOff,
   MoreHorizontal,
   Pencil,
   Rocket,
@@ -43,40 +47,118 @@ function Favicon({ src, letter }: { src: string | null; letter: string }) {
 /* ------------------------------------------------------------------ */
 
 export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?: (a: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [cover, setCover] = useState(folder.coverUrl);
+  const [busy, setBusy] = useState(false);
+  const [prevUrl, setPrevUrl] = useState(folder.coverUrl);
+  if (folder.coverUrl !== prevUrl) {
+    setPrevUrl(folder.coverUrl);
+    setCover(folder.coverUrl);
+  }
+  const hue = hueFor(folder.name);
+
   const parts = [
     `${folder.bookmarkCount} ${folder.bookmarkCount === 1 ? "link" : "links"}`,
     folder.subfolderCount ? `${folder.subfolderCount} ${folder.subfolderCount === 1 ? "folder" : "folders"}` : null,
   ].filter(Boolean);
 
+  async function upload(file: File) {
+    setBusy(true);
+    const before = cover;
+    try {
+      const { blob, width, height } = await resizeImage(file);
+      setCover(URL.createObjectURL(blob));
+      const form = new FormData();
+      form.set("file", blob, "cover");
+      form.set("width", String(width));
+      form.set("height", String(height));
+      const res = await setFolderCover(folder.id, form);
+      if (!res.ok) throw new Error(res.error);
+      toast.success("Cover updated");
+    } catch (e) {
+      setCover(before);
+      toast.error(e instanceof Error ? e.message : "Couldn't update the cover.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeCover() {
+    const before = cover;
+    setCover(null);
+    const res = await removeFolderCover(folder.id);
+    if (!res.ok) {
+      setCover(before);
+      toast.error("Couldn't remove the cover.");
+    }
+  }
+
   return (
-    <article className="card group relative flex min-h-40 flex-col p-4 sm:min-h-48 sm:p-6">
-      <div className="flex items-start justify-between">
-        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-elevated text-3xl sm:h-16 sm:w-16 sm:text-4xl" aria-hidden>
-          {folder.icon ?? <FolderIcon className="h-7 w-7 text-accent" />}
-        </div>
-        <Menu trigger={menuTrigger(`Actions for ${folder.name}`)}>
-          <MenuItem icon={<Pencil />} onSelect={() => onAction?.("rename")}>Rename</MenuItem>
-          <MenuItem icon={<ArrowRightLeft />} onSelect={() => onAction?.("move")}>Move / reorder</MenuItem>
-          <MenuSeparator />
-          <MenuItem icon={<Trash2 />} danger onSelect={() => onAction?.("delete")}>Move to Trash</MenuItem>
-        </Menu>
-      </div>
-      <h3 className="mt-auto truncate pt-4 text-base font-semibold sm:pt-6 sm:text-xl">
-        <Link href={`/f/${folder.id}`} className="stretched-link focus-visible:outline-none">
-          {folder.name}
-        </Link>
-      </h3>
-      <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted sm:gap-3 sm:text-sm">
-        <span className="truncate">{parts.join(" · ")}</span>
-        {folder.launchCount > 0 && (
-          <span
-            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/12 px-2.5 py-1 text-xs font-semibold text-accent"
-            title={`${folder.launchCount} launch links`}
-          >
-            <Rocket className="h-3.5 w-3.5" aria-hidden />
-            {folder.launchCount}
-          </span>
+    <article className="card group relative flex flex-col overflow-hidden">
+      <div
+        className="relative aspect-[16/10] w-full overflow-hidden sm:aspect-[16/9]"
+        style={{
+          background: `radial-gradient(120% 120% at 0% 0%, hsl(${hue} 20% 20%) 0%, #1d2025 60%, #17191d 100%)`,
+        }}
+      >
+        {cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={cover} alt="" className={cn("h-full w-full object-cover transition-opacity", busy && "opacity-60")} />
+        ) : (
+          <div className="grid h-full place-items-center">
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white/6 text-3xl ring-1 ring-white/10 sm:h-16 sm:w-16 sm:text-4xl" aria-hidden>
+              {folder.icon ?? <FolderIcon className="h-7 w-7 text-accent sm:h-8 sm:w-8" />}
+            </div>
+          </div>
         )}
+        <div className="absolute right-2 top-2 z-10 rounded-lg bg-black/45 backdrop-blur">
+          <Menu trigger={menuTrigger(`Actions for ${folder.name}`)}>
+            <MenuItem icon={<ImageIcon />} onSelect={() => fileRef.current?.click()}>
+              {cover ? "Change cover image" : "Add cover image"}
+            </MenuItem>
+            {cover && (
+              <MenuItem icon={<ImageOff />} onSelect={removeCover}>
+                Remove cover
+              </MenuItem>
+            )}
+            <MenuSeparator />
+            <MenuItem icon={<Pencil />} onSelect={() => onAction?.("rename")}>Rename</MenuItem>
+            <MenuItem icon={<ArrowRightLeft />} onSelect={() => onAction?.("move")}>Move / reorder</MenuItem>
+            <MenuSeparator />
+            <MenuItem icon={<Trash2 />} danger onSelect={() => onAction?.("delete")}>Move to Trash</MenuItem>
+          </Menu>
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) upload(f);
+          }}
+        />
+      </div>
+
+      <div className="flex flex-1 flex-col p-3.5 sm:p-5">
+        <h3 className="truncate text-base font-semibold sm:text-lg">
+          <Link href={`/f/${folder.id}`} dir="auto" className="stretched-link focus-visible:outline-none">
+            {folder.name}
+          </Link>
+        </h3>
+        <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted sm:gap-3 sm:text-sm">
+          <span className="truncate">{parts.join(" · ")}</span>
+          {folder.launchCount > 0 && (
+            <span
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/12 px-2.5 py-1 text-xs font-semibold text-accent"
+              title={`${folder.launchCount} launch links`}
+            >
+              <Rocket className="h-3.5 w-3.5" aria-hidden />
+              {folder.launchCount}
+            </span>
+          )}
+        </div>
       </div>
     </article>
   );

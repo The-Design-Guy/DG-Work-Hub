@@ -6,8 +6,18 @@ import {
   doublePrecision,
   uuid,
   index,
+  integer,
+  customType,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+
+/** bytea that works with both the Neon HTTP driver (hex text) and node-postgres (Buffer). */
+const bytea = customType<{ data: Buffer; driverData: string | Buffer }>({
+  dataType: () => "bytea",
+  toDriver: (v) => `\\x${v.toString("hex")}`,
+  fromDriver: (v) =>
+    Buffer.isBuffer(v) ? v : Buffer.from(String(v).replace(/^\\x/, ""), "hex"),
+});
 
 /* ------------------------------------------------------------------ */
 /* Auth tables (Better Auth)                                           */
@@ -85,6 +95,23 @@ export const verification = pgTable("verification", {
  * touching items that were trashed separately before.
  */
 
+/** Small uploaded images (folder covers), resized in the browser before upload. */
+export const image = pgTable(
+  "image",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mime: text("mime").notNull(),
+    data: bytea("data").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("image_owner_idx").on(t.ownerId)],
+);
+
 export const folder = pgTable(
   "folder",
   {
@@ -97,6 +124,7 @@ export const folder = pgTable(
     }),
     name: text("name").notNull(),
     icon: text("icon"),
+    coverImageId: uuid("cover_image_id").references(() => image.id, { onDelete: "set null" }),
     sortOrder: doublePrecision("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

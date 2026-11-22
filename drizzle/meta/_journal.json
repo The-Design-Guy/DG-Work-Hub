@@ -15,6 +15,13 @@
       "when": 1795368240385,
       "tag": "0001_import_id",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795369071812,
+      "tag": "0002_folder_covers",
+      "breakpoints": true
     }
   ]
 }

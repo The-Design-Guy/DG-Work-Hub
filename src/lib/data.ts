@@ -17,6 +17,7 @@ function folderSelect(ownerId: string) {
     parentId: folder.parentId,
     name: folder.name,
     icon: folder.icon,
+    coverUrl: sql<string | null>`case when ${folder.coverImageId} is null then null else '/api/images/' || ${folder.coverImageId} end`,
     bookmarkCount: sql<number>`(select count(*)::int from ${bookmark} b
       where b.folder_id = ${outerId} and b.owner_id = ${ownerId} and b.deleted_at is null)`,
     launchCount: sql<number>`(select count(*)::int from ${bookmark} b
