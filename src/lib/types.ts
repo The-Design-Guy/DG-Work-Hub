@@ -6,6 +6,7 @@ export type FolderView = {
   name: string;
   icon: string | null;
   coverUrl: string | null;
+  isProject: boolean;
   bookmarkCount: number;
   launchCount: number;
   subfolderCount: number;

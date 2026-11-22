@@ -17,6 +17,7 @@ function folderSelect(ownerId: string) {
     parentId: folder.parentId,
     name: folder.name,
     icon: folder.icon,
+    isProject: folder.isProject,
     coverUrl: sql<string | null>`case when ${folder.coverImageId} is null then null else '/api/images/' || ${folder.coverImageId} end`,
     bookmarkCount: sql<number>`(select count(*)::int from ${bookmark} b
       where b.folder_id = ${outerId} and b.owner_id = ${ownerId} and b.deleted_at is null)`,
@@ -69,7 +70,11 @@ async function childBookmarks(ownerId: string, folderId: string | null): Promise
 
 export async function getRoot(ownerId: string) {
   const [folders, bookmarks] = await Promise.all([childFolders(ownerId, null), childBookmarks(ownerId, null)]);
-  return { folders, bookmarks };
+  return {
+    projects: folders.filter((f) => f.isProject),
+    library: folders.filter((f) => !f.isProject),
+    bookmarks,
+  };
 }
 
 export async function getFolder(ownerId: string, id: string) {

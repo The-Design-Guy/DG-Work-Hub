@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { removeFolderCover, setFolderCover, unpackFolder } from "@/app/actions/folders";
+import { removeFolderCover, setFolderCover, setProject, subfoldersToProjects, unpackFolder } from "@/app/actions/folders";
 import { Dialog } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { resizeImage } from "@/lib/resize-image";
@@ -14,6 +14,9 @@ import {
   Image as ImageIcon,
   ImageOff,
   FolderOutput,
+  Briefcase,
+  Library,
+  LayoutGrid,
   MoreHorizontal,
   Pencil,
   Rocket,
@@ -53,8 +56,13 @@ export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?
   const fileRef = useRef<HTMLInputElement>(null);
   const [cover, setCover] = useState(folder.coverUrl);
   const [busy, setBusy] = useState(false);
-  const [unpackOpen, setUnpackOpen] = useState(false);
-  const [unpacking, setUnpacking] = useState(false);
+  const [confirm, setConfirm] = useState<null | {
+    title: string;
+    text: string;
+    cta: string;
+    run: () => Promise<string | null>;
+  }>(null);
+  const [running, setRunning] = useState(false);
   const [prevUrl, setPrevUrl] = useState(folder.coverUrl);
   if (folder.coverUrl !== prevUrl) {
     setPrevUrl(folder.coverUrl);
@@ -90,13 +98,40 @@ export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?
 
   const unpackLabel = folder.parentId ? "Move contents up one level" : "Move contents to Home";
 
-  async function unpack() {
-    setUnpacking(true);
-    const res = await unpackFolder(folder.id);
-    setUnpacking(false);
-    setUnpackOpen(false);
-    if (!res.ok) return toast.error(res.error);
-    toast.success(`Moved ${res.folders} folders and ${res.bookmarks} links. “${folder.name}” is in Trash.`);
+  const n = (c: number, one: string, many: string) => `${c} ${c === 1 ? one : many}`;
+
+  function askUnpack() {
+    setConfirm({
+      title: `${unpackLabel}?`,
+      text: `${n(folder.subfolderCount, "folder", "folders")} and ${n(folder.bookmarkCount, "link", "links")} move out of “${folder.name}”. Subfolders keep everything inside them. The empty “${folder.name}” folder goes to Trash.`,
+      cta: "Move contents",
+      run: async () => {
+        const res = await unpackFolder(folder.id);
+        if (!res.ok) return res.error;
+        toast.success(`Moved ${n(res.folders, "folder", "folders")} and ${n(res.bookmarks, "link", "links")}. “${folder.name}” is in Trash.`);
+        return null;
+      },
+    });
+  }
+
+  function askToProjects() {
+    setConfirm({
+      title: "Turn subfolders into projects?",
+      text: `Each of the ${n(folder.subfolderCount, "subfolder", "subfolders")} in “${folder.name}” becomes a project on Home, with everything inside it.${folder.bookmarkCount ? ` ${n(folder.bookmarkCount, "loose link moves", "loose links move")} to Home.` : ""} The empty “${folder.name}” folder goes to Trash.`,
+      cta: "Create projects",
+      run: async () => {
+        const res = await subfoldersToProjects(folder.id);
+        if (!res.ok) return res.error;
+        toast.success(`${n(res.projects, "project", "projects")} added to Home.`);
+        return null;
+      },
+    });
+  }
+
+  async function toggleProject(value: boolean) {
+    const res = await setProject(folder.id, value);
+    if (!res.ok) return toast.error("Couldn't update the folder.");
+    toast.success(value ? (res.moved ? "Moved to Home as a project" : "Now a project") : "Moved to Library");
   }
 
   async function removeCover() {
@@ -140,23 +175,45 @@ export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?
             <MenuSeparator />
             <MenuItem icon={<Pencil />} onSelect={() => onAction?.("rename")}>Rename</MenuItem>
             <MenuItem icon={<ArrowRightLeft />} onSelect={() => onAction?.("move")}>Move / reorder</MenuItem>
+            <MenuSeparator />
+            {folder.isProject ? (
+              <MenuItem icon={<Library />} onSelect={() => toggleProject(false)}>Move to Library</MenuItem>
+            ) : (
+              <MenuItem icon={<Briefcase />} onSelect={() => toggleProject(true)}>
+                {folder.parentId ? "Move to Home as a project" : "Make it a project"}
+              </MenuItem>
+            )}
+            {folder.subfolderCount > 0 && (
+              <MenuItem icon={<LayoutGrid />} onSelect={askToProjects}>Turn subfolders into projects</MenuItem>
+            )}
             {(folder.bookmarkCount > 0 || folder.subfolderCount > 0) && (
-              <MenuItem icon={<FolderOutput />} onSelect={() => setUnpackOpen(true)}>{unpackLabel}</MenuItem>
+              <MenuItem icon={<FolderOutput />} onSelect={askUnpack}>{unpackLabel}</MenuItem>
             )}
             <MenuSeparator />
             <MenuItem icon={<Trash2 />} danger onSelect={() => onAction?.("delete")}>Move to Trash</MenuItem>
           </Menu>
         </div>
         <Dialog
-          open={unpackOpen}
-          onOpenChange={setUnpackOpen}
-          title={`${unpackLabel}?`}
-          description={`${folder.subfolderCount} ${folder.subfolderCount === 1 ? "folder" : "folders"} and ${folder.bookmarkCount} ${folder.bookmarkCount === 1 ? "link" : "links"} move out of “${folder.name}”. Subfolders keep everything inside them. The empty “${folder.name}” folder goes to Trash.`}
+          open={!!confirm}
+          onOpenChange={(o) => !o && !running && setConfirm(null)}
+          title={confirm?.title ?? ""}
+          description={confirm?.text}
         >
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setUnpackOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={unpack} disabled={unpacking}>
-              {unpacking ? "Moving…" : "Move contents"}
+            <Button variant="ghost" onClick={() => setConfirm(null)} disabled={running}>Cancel</Button>
+            <Button
+              variant="primary"
+              disabled={running}
+              onClick={async () => {
+                if (!confirm) return;
+                setRunning(true);
+                const err = await confirm.run();
+                setRunning(false);
+                setConfirm(null);
+                if (err) toast.error(err);
+              }}
+            >
+              {running ? "Working…" : confirm?.cta}
             </Button>
           </div>
         </Dialog>

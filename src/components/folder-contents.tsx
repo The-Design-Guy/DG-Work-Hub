@@ -23,6 +23,12 @@ export function FolderGrid({ folders }: { folders: FolderView[] }) {
 
 function useLaunchToggle(initial: BookmarkView[]) {
   const [bookmarks, setBookmarks] = useState(initial);
+  // Server data changed (refresh after an action): take the new list.
+  const [prev, setPrev] = useState(initial);
+  if (prev !== initial) {
+    setPrev(initial);
+    setBookmarks(initial);
+  }
   async function toggle(id: string, next: boolean) {
     setBookmarks((list) => list.map((b) => (b.id === id ? { ...b, launchOnStart: next } : b)));
     const res = await setLaunch(id, next);

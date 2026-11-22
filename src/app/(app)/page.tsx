@@ -8,9 +8,9 @@ import { requireUser } from "@/lib/session";
 
 export default async function Home() {
   const user = await requireUser();
-  const { folders, bookmarks } = await getRoot(user.id);
+  const { projects, library, bookmarks } = await getRoot(user.id);
 
-  if (!folders.length && !bookmarks.length) {
+  if (!projects.length && !library.length && !bookmarks.length) {
     return (
       <EmptyState
         title="Let's fill this up"
@@ -27,20 +27,38 @@ export default async function Home() {
 
   return (
     <>
-      <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Your folders</h1>
-      <p className="mt-1 text-sm text-muted">
-        {folders.length} {folders.length === 1 ? "folder" : "folders"}
-        {bookmarks.length > 0 && ` · ${bookmarks.length} ${bookmarks.length === 1 ? "link" : "links"}`}
-      </p>
-      {folders.length > 0 && (
-        <section className="mt-8" aria-label="Folders">
-          <FolderGrid folders={folders} />
+      <section aria-labelledby="projects-h">
+        <h1 id="projects-h" className="text-3xl font-bold tracking-tight sm:text-4xl">Projects</h1>
+        <p className="mt-1 text-sm text-muted">
+          {projects.length
+            ? `${projects.length} ${projects.length === 1 ? "project" : "projects"}`
+            : "No projects yet. Open a folder's ⋯ menu and choose “Make it a project”."}
+        </p>
+        {projects.length > 0 && (
+          <div className="mt-8">
+            <FolderGrid folders={projects} />
+          </div>
+        )}
+      </section>
+
+      {library.length > 0 && (
+        <section className="mt-14" aria-labelledby="library-h">
+          <h2 id="library-h" className="text-2xl font-bold tracking-tight">Library</h2>
+          <p className="mt-1 text-sm text-muted">
+            {library.length} {library.length === 1 ? "folder" : "folders"}
+          </p>
+          <div className="mt-6">
+            <FolderGrid folders={library} />
+          </div>
         </section>
       )}
+
       {bookmarks.length > 0 && (
-        <section className="mt-10" aria-labelledby="root-links">
-          <h2 id="root-links" className="section-title">Links</h2>
-          <BookmarkGrid bookmarks={bookmarks} />
+        <section className="mt-14" aria-labelledby="root-links">
+          <h2 id="root-links" className="text-2xl font-bold tracking-tight">Links</h2>
+          <div className="mt-6">
+            <BookmarkGrid bookmarks={bookmarks} />
+          </div>
         </section>
       )}
     </>

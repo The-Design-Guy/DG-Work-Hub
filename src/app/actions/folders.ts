@@ -135,3 +135,85 @@ export async function unpackFolder(folderId: string) {
   revalidatePath("/", "layout");
   return { ok: true as const, target, folders: kidsF.length, bookmarks: kidsB.length };
 }
+
+async function rootMaxes(ownerId: string) {
+  const { bookmark } = schema;
+  const [fb] = await db
+    .select({ m: sql<number>`coalesce(max(${folder.sortOrder}), 0)` })
+    .from(folder)
+    .where(and(eq(folder.ownerId, ownerId), isNull(folder.parentId)));
+  const [bb] = await db
+    .select({ m: sql<number>`coalesce(max(${bookmark.sortOrder}), 0)` })
+    .from(bookmark)
+    .where(and(eq(bookmark.ownerId, ownerId), isNull(bookmark.folderId)));
+  return { f: Number(fb?.m ?? 0), b: Number(bb?.m ?? 0) };
+}
+
+/** Marks a folder as a project (moving it to Home if needed), or back to Library. */
+export async function setProject(folderId: string, value: boolean) {
+  const user = await requireUser();
+  if (!z.uuid().safeParse(folderId).success) return { ok: false as const };
+  const [f] = await db
+    .select({ id: folder.id, parentId: folder.parentId })
+    .from(folder)
+    .where(and(eq(folder.id, folderId), eq(folder.ownerId, user.id), isNull(folder.deletedAt)));
+  if (!f) return { ok: false as const };
+  const now = new Date();
+  const move = value && f.parentId !== null ? { parentId: null, sortOrder: (await rootMaxes(user.id)).f + 1 } : {};
+  await db
+    .update(folder)
+    .set({ isProject: value, updatedAt: now, ...move })
+    .where(and(eq(folder.id, folderId), eq(folder.ownerId, user.id)));
+  revalidatePath("/", "layout");
+  return { ok: true as const, moved: "parentId" in move };
+}
+
+/**
+ * Every subfolder becomes a project on Home (keeping its contents), loose links
+ * move to Home, and the emptied folder goes to Trash.
+ */
+export async function subfoldersToProjects(folderId: string) {
+  const user = await requireUser();
+  const { bookmark } = schema;
+  if (!z.uuid().safeParse(folderId).success) return { ok: false as const, error: "Folder not found." };
+  const [f] = await db
+    .select({ id: folder.id })
+    .from(folder)
+    .where(and(eq(folder.id, folderId), eq(folder.ownerId, user.id), isNull(folder.deletedAt)));
+  if (!f) return { ok: false as const, error: "Folder not found." };
+
+  const kidsF = await db
+    .select({ id: folder.id })
+    .from(folder)
+    .where(and(eq(folder.parentId, folderId), eq(folder.ownerId, user.id), isNull(folder.deletedAt)))
+    .orderBy(folder.sortOrder, folder.createdAt);
+  const kidsB = await db
+    .select({ id: bookmark.id })
+    .from(bookmark)
+    .where(and(eq(bookmark.folderId, folderId), eq(bookmark.ownerId, user.id), isNull(bookmark.deletedAt)))
+    .orderBy(bookmark.sortOrder, bookmark.createdAt);
+  if (!kidsF.length) return { ok: false as const, error: "This folder has no subfolders." };
+
+  const base = await rootMaxes(user.id);
+  const now = new Date();
+  await atomic([
+    ...kidsF.map((k, i) =>
+      db
+        .update(folder)
+        .set({ parentId: null, isProject: true, sortOrder: base.f + i + 1, updatedAt: now })
+        .where(and(eq(folder.id, k.id), eq(folder.ownerId, user.id))),
+    ),
+    ...kidsB.map((k, i) =>
+      db
+        .update(bookmark)
+        .set({ folderId: null, sortOrder: base.b + i + 1, updatedAt: now })
+        .where(and(eq(bookmark.id, k.id), eq(bookmark.ownerId, user.id))),
+    ),
+    db
+      .update(folder)
+      .set({ deletedAt: now, deleteBatchId: randomUUID(), updatedAt: now })
+      .where(and(eq(folder.id, folderId), eq(folder.ownerId, user.id))),
+  ]);
+  revalidatePath("/", "layout");
+  return { ok: true as const, projects: kidsF.length, bookmarks: kidsB.length };
+}

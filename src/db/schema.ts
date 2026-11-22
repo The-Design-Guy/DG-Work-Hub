@@ -124,6 +124,8 @@ export const folder = pgTable(
     }),
     name: text("name").notNull(),
     icon: text("icon"),
+    /** Top-level folders flagged as projects show in Home's "Projects" section. */
+    isProject: boolean("is_project").notNull().default(false),
     coverImageId: uuid("cover_image_id").references(() => image.id, { onDelete: "set null" }),
     sortOrder: doublePrecision("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
