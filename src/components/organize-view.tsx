@@ -259,10 +259,10 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
     return (t.kidsB[id]?.length ?? 0) + (t.kidsF[id] ?? []).reduce((n, c) => n + count(t, c), 0);
   }
 
+  /** editable = the new structure (drop target). Otherwise the current structure you drag from. */
   function renderTree(t: Tree, key: Key, depth: number, editable: boolean): ReactNode {
     const open = editable ? openR : openL;
     const setOpen = editable ? setOpenR : setOpenL;
-    const p = editable ? draftP : origP;
     const fIds = t.kidsF[key] ?? [];
     const bIds = t.kidsB[key] ?? [];
     if (!fIds.length && !bIds.length) {
@@ -275,22 +275,23 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
         {fIds.map((id) => {
           const f = byF.get(id)!;
           const isOpen = open.has(id);
-          const moved = editable && origP.pf[id] !== p.pf[id];
+          const moved = origP.pf[id] !== draftP.pf[id];
           const h = editable && hint?.type === "f" && hint.id === id ? hint.zone : null;
           return (
             <li key={id}>
               <Row
-                uid={editable ? `f:${id}` : null}
+                dragUid={editable ? `f:${id}` : `sf:${id}`}
+                dropUid={editable ? `f:${id}` : null}
                 style={{ paddingLeft: depth * 20 + 6 }}
                 className={cn(
                   "group relative flex min-h-10 items-center gap-2 rounded-lg pr-2",
                   h === "into" ? "bg-accent/15 ring-1 ring-accent" : "hover:bg-elevated/60",
-                  moved && "shadow-[inset_3px_0_0_var(--color-accent)]",
+                  moved && (editable ? "shadow-[inset_3px_0_0_var(--color-accent)]" : "opacity-45"),
                 )}
               >
                 {h === "before" && <span className="drop-line top-0" />}
                 {h === "after" && <span className="drop-line bottom-0" />}
-                {editable && <GripVertical className="h-5 w-5 shrink-0 text-muted group-hover:text-accent" aria-hidden />}
+                <GripVertical className="h-5 w-5 shrink-0 text-muted group-hover:text-accent" aria-hidden />
                 <button
                   type="button"
                   aria-label={isOpen ? `Collapse ${f.name}` : `Expand ${f.name}`}
@@ -322,21 +323,22 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
         })}
         {bIds.map((id) => {
           const b = byB.get(id)!;
-          const moved = editable && origP.pb[id] !== p.pb[id];
+          const moved = origP.pb[id] !== draftP.pb[id];
           const h = editable && hint?.type === "b" && hint.id === id ? hint.zone : null;
           return (
             <li key={id}>
               <Row
-                uid={editable ? `b:${id}` : null}
+                dragUid={editable ? `b:${id}` : `sb:${id}`}
+                dropUid={editable ? `b:${id}` : null}
                 style={{ paddingLeft: depth * 20 + 6 }}
                 className={cn(
                   "group relative flex min-h-10 items-center gap-2 rounded-lg pr-2 hover:bg-elevated/60",
-                  moved && "shadow-[inset_3px_0_0_var(--color-accent)]",
+                  moved && (editable ? "shadow-[inset_3px_0_0_var(--color-accent)]" : "opacity-45"),
                 )}
               >
                 {h === "before" && <span className="drop-line top-0" />}
                 {h === "after" && <span className="drop-line bottom-0" />}
-                {editable && <GripVertical className="h-5 w-5 shrink-0 text-muted group-hover:text-accent" aria-hidden />}
+                <GripVertical className="h-5 w-5 shrink-0 text-muted group-hover:text-accent" aria-hidden />
                 <span className="w-6 shrink-0" />
                 {b.faviconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -383,7 +385,7 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
 
       {/* Phones/tablets: tabs. Desktop: side by side. */}
       <div role="tablist" aria-label="View" className="mb-4 flex gap-1 rounded-xl border border-line bg-surface p-1 lg:hidden">
-        {(["current", "edit"] as const).map((k) => (
+        {(["edit", "current"] as const).map((k) => (
           <button
             key={k}
             role="tab"
@@ -391,54 +393,57 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
             onClick={() => setTab(k)}
             className={cn("h-10 flex-1 rounded-lg text-sm font-semibold", tab === k ? "bg-elevated text-text" : "text-muted")}
           >
-            {k === "current" ? "Current" : "Edit"}
+            {k === "current" ? "Current" : "New structure"}
           </button>
         ))}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <section aria-label="Current structure" className={cn("pane", tab !== "current" && "max-lg:hidden")}>
-          <header className="pane-head">
-            <span>Current</span>
-            <span className="text-xs font-normal text-muted">Read only</span>
-          </header>
-          <div className="pane-body">
-            {homeRow(false)}
-            <ul>{renderTree(original, ROOT, 0, false)}</ul>
-          </div>
-        </section>
-
-        <section aria-label="Edit structure" className={cn("pane border-accent/40", tab !== "edit" && "max-lg:hidden")}>
-          <header className="pane-head">
-            <span>Edit</span>
-            <span className="text-xs font-normal text-muted">
-              <span className="hidden lg:inline">Drag onto a folder to move inside it, or between rows to reorder.</span>
-              <span className="lg:hidden">Use ⇄ to move, ↑ ↓ to reorder.</span>
-            </span>
-          </header>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={pointerWithin}
-            onDragStart={onStart}
-            onDragMove={onMove}
-            onDragEnd={onEnd}
-            onDragCancel={end}
-          >
-            <div className={cn("pane-body", drag && "select-none")}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        onDragStart={onStart}
+        onDragMove={onMove}
+        onDragEnd={onEnd}
+        onDragCancel={end}
+      >
+        <div className={cn("grid gap-5 lg:grid-cols-2", drag && "select-none")}>
+          <section aria-label="New structure" className={cn("pane border-accent/40", tab !== "edit" && "max-lg:hidden")}>
+            <header className="pane-head">
+              <span>New structure</span>
+              <span className="text-xs font-normal text-muted">
+                <span className="hidden lg:inline">Drop items here. Drag rows to reorder.</span>
+                <span className="lg:hidden">Use ⇄ to move, ↑ ↓ to reorder.</span>
+              </span>
+            </header>
+            <div className="pane-body">
               {homeRow(true)}
               <ul>{renderTree(draft, ROOT, 0, true)}</ul>
             </div>
-            <DragOverlay dropAnimation={null}>
-              {drag && (
-                <div className="flex max-w-xs items-center gap-2 rounded-lg border border-accent bg-elevated px-3 py-2 text-sm font-semibold shadow-2xl shadow-black/60">
-                  {drag.type === "f" ? <Folder className="h-4 w-4 text-accent" /> : <span className="h-2 w-2 rounded-full bg-accent" />}
-                  <span dir="auto" className="truncate">{drag.type === "f" ? byF.get(drag.id)?.name : byB.get(drag.id)?.title}</span>
-                </div>
-              )}
-            </DragOverlay>
-          </DndContext>
-        </section>
-      </div>
+          </section>
+
+          <section aria-label="Current structure" className={cn("pane", tab !== "current" && "max-lg:hidden")}>
+            <header className="pane-head">
+              <span>Current</span>
+              <span className="text-xs font-normal text-muted">
+                <span className="hidden lg:inline">Drag from here to the left ⟵</span>
+                <span className="lg:hidden">As it is now</span>
+              </span>
+            </header>
+            <div className="pane-body">
+              {homeRow(false)}
+              <ul>{renderTree(original, ROOT, 0, false)}</ul>
+            </div>
+          </section>
+        </div>
+        <DragOverlay dropAnimation={null}>
+          {drag && (
+            <div className="flex max-w-xs items-center gap-2 rounded-lg border border-accent bg-elevated px-3 py-2 text-sm font-semibold shadow-2xl shadow-black/60">
+              {drag.type === "f" ? <Folder className="h-4 w-4 text-accent" /> : <span className="h-2 w-2 rounded-full bg-accent" />}
+              <span dir="auto" className="truncate">{drag.type === "f" ? byF.get(drag.id)?.name : byB.get(drag.id)?.title}</span>
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
 
       {moveDlg && (
         <MoveDialog
@@ -463,18 +468,26 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
 
 const parseUid = (uid: string): Item | null => {
   const [t, id] = uid.split(":");
-  return (t === "f" || t === "b") && id ? { type: t, id } : null;
+  const type = t === "f" || t === "sf" ? "f" : t === "b" || t === "sb" ? "b" : null;
+  return type && id ? { type, id } : null;
 };
 
-/** A tree row. In the Edit pane (uid set) the whole row is draggable and a drop target. */
-function Row({ uid, children, className, style }: { uid: string | null; children: ReactNode; className: string; style: CSSProperties }) {
-  if (!uid) return <div className={className} style={style}>{children}</div>;
-  return <DraggableRow uid={uid} className={className} style={style}>{children}</DraggableRow>;
-}
-
-function DraggableRow({ uid, children, className, style }: { uid: string; children: ReactNode; className: string; style: CSSProperties }) {
-  const drag = useDraggable({ id: uid });
-  const drop = useDroppable({ id: uid });
+/** A tree row: draggable from both panes, a drop target only in the new structure. */
+function Row({
+  dragUid,
+  dropUid,
+  children,
+  className,
+  style,
+}: {
+  dragUid: string;
+  dropUid: string | null;
+  children: ReactNode;
+  className: string;
+  style: CSSProperties;
+}) {
+  const drag = useDraggable({ id: dragUid });
+  const drop = useDroppable({ id: dropUid ?? `none:${dragUid}`, disabled: !dropUid });
   return (
     <div
       ref={(el) => {
