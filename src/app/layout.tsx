@@ -21,7 +21,7 @@ const openSans = localFont({
 });
 
 export const metadata: Metadata = {
-  title: { default: "DG Work Hub", template: "%s · DG Work Hub" },
+  title: { default: "The Work Hub · Design Guy", template: "%s · The Work Hub" },
   description: "The Design Guy — private visual bookmarks.",
   robots: { index: false, follow: false },
 };

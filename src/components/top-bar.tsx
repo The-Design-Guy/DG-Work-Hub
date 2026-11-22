@@ -39,9 +39,24 @@ export function TopBar({
   return (
     <header className="sticky top-0 z-40 border-b border-line/70 bg-bg/85 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap sm:gap-4 sm:px-8">
-        <Link href="/" className="flex shrink-0 items-center gap-2.5 rounded-xl pr-1" aria-label="DG Work Hub — home">
-          <Image src="/brand/dg-head.svg" alt="" width={36} height={36} priority />
-          <span className="hidden font-heading text-lg font-semibold tracking-tight md:inline">Work Hub</span>
+        <Link
+          href="/"
+          className="flex shrink-0 items-center gap-2 rounded-xl sm:gap-3 sm:pr-1"
+          aria-label="Design Guy — The Work Hub, home"
+        >
+          <Image src="/brand/dg-head.svg" alt="" width={52} height={52} priority className="h-11 w-11 sm:h-[52px] sm:w-[52px]" />
+          <Image
+            src="/brand/dg-logo.svg"
+            alt=""
+            width={219}
+            height={40}
+            priority
+            className="h-6 w-auto sm:h-9 lg:h-10"
+          />
+          <span className="hidden h-8 w-px bg-line xl:block" aria-hidden />
+          <span className="hidden font-heading text-sm font-semibold uppercase leading-tight tracking-[0.22em] text-text xl:block">
+            The Work Hub
+          </span>
         </Link>
 
         <div className="relative order-last w-full sm:order-none sm:max-w-xl sm:flex-1">
@@ -58,7 +73,7 @@ export function TopBar({
           </kbd>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <Button variant="secondary" size="md" onClick={() => setNewFolder(true)} aria-label="New folder">
             <FolderPlus className="h-4.5 w-4.5" />
             <span className="hidden lg:inline">New Folder</span>
