@@ -45,17 +45,18 @@ export function TopBar({
           aria-label="Design Guy — The Work Hub, home"
         >
           <Image src="/brand/dg-head.svg" alt="" width={52} height={52} priority className="h-11 w-11 sm:h-[52px] sm:w-[52px]" />
-          <Image
-            src="/brand/dg-logo.svg"
-            alt=""
-            width={219}
-            height={40}
-            priority
-            className="h-6 w-auto sm:h-9 lg:h-10"
-          />
-          <span className="hidden h-8 w-px bg-line xl:block" aria-hidden />
-          <span className="hidden font-heading text-sm font-semibold uppercase leading-tight tracking-[0.22em] text-text xl:block">
-            The Work Hub
+          <span className="flex flex-col items-start gap-1 sm:gap-1.5">
+            <Image
+              src="/brand/dg-wordmark.svg"
+              alt=""
+              width={164}
+              height={20}
+              priority
+              className="h-4 w-auto sm:h-6 lg:h-7"
+            />
+            <span className="font-heading text-[8px] font-medium uppercase leading-none tracking-[0.3em] text-text sm:text-[11px] lg:text-xs">
+              The Work Hub
+            </span>
           </span>
         </Link>
 

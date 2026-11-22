@@ -20,8 +20,8 @@ export default async function LoginPage() {
           className="mx-auto"
         />
         <h1 className="mt-6">
-          <Image src="/brand/dg-logo.svg" alt="Design Guy" width={240} height={44} className="mx-auto h-11 w-auto" />
-          <span className="mt-4 block font-heading text-sm font-semibold uppercase tracking-[0.22em]">The Work Hub</span>
+          <Image src="/brand/dg-wordmark.svg" alt="Design Guy" width={260} height={32} className="mx-auto h-8 w-auto" />
+          <span className="mt-3 block font-heading text-sm font-medium uppercase tracking-[0.32em]">The Work Hub</span>
         </h1>
         <p className="mt-2 text-sm text-muted">Private. Sign in to open your bookmarks.</p>
         <SignInButton />
