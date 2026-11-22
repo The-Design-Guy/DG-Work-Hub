@@ -1,6 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  TouchSensor,
+  pointerWithin,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragMoveEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -161,48 +174,65 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
     router.refresh();
   }
 
-  /* ---------- drag & drop (desktop) ---------- */
+  /* ---------- drag & drop: mouse, trackpad and touch (dnd-kit) ---------- */
 
-  function zoneFor(e: DragEvent, target: "f" | "b"): Zone | null {
-    if (!drag) return null;
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const y = (e.clientY - r.top) / r.height;
-    if (target === "f") {
-      if (drag.type === "b") return "into";
-      return y < 0.28 ? "before" : y > 0.72 ? "after" : "into";
-    }
-    if (drag.type === "f") return null;
-    return y < 0.5 ? "before" : "after";
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  );
+
+  function pointerY(e: DragMoveEvent) {
+    const a = e.activatorEvent as MouseEvent | TouchEvent;
+    const y0 = "touches" in a ? (a.touches[0] ?? a.changedTouches[0]).clientY : a.clientY;
+    return y0 + e.delta.y;
   }
 
-  function onOver(e: DragEvent, type: "f" | "b", id: string) {
-    const zone = zoneFor(e, type);
-    if (!zone || !drag || (drag.type === "f" && type === "f" && (id === drag.id || isInside(draftP.pf, id, drag.id)))) {
-      setHint(null);
+  function onStart(e: DragStartEvent) {
+    setDrag(parseUid(String(e.active.id)));
+  }
+
+  function onMove(e: DragMoveEvent) {
+    const d = drag;
+    if (!d || !e.over) return hint && setHint(null);
+    const overId = String(e.over.id);
+    if (overId === ROOT) {
+      if (hint?.type !== "root") setHint({ type: "root", id: ROOT, zone: "into" });
       return;
     }
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    if (hint?.id !== id || hint.zone !== zone || hint.type !== type) setHint({ type, id, zone });
-    // Hovering over a closed folder opens it after a moment.
-    if (type === "f" && zone === "into" && !openR.has(id)) {
-      if (hoverTimer.current?.id !== id) {
+    const target = parseUid(overId);
+    if (!target) return;
+    const r = e.over.rect;
+    const y = (pointerY(e) - r.top) / r.height;
+    let zone: Zone | null;
+    if (target.type === "f") zone = d.type === "b" ? "into" : y < 0.28 ? "before" : y > 0.72 ? "after" : "into";
+    else zone = d.type === "f" ? null : y < 0.5 ? "before" : "after";
+    if (!zone || (d.type === "f" && target.type === "f" && (target.id === d.id || isInside(draftP.pf, target.id, d.id)))) {
+      return hint && setHint(null);
+    }
+    if (hint?.id !== target.id || hint.zone !== zone || hint.type !== target.type) setHint({ type: target.type, id: target.id, zone });
+    // Holding over a closed folder opens it.
+    if (target.type === "f" && zone === "into" && !openR.has(target.id)) {
+      if (hoverTimer.current?.id !== target.id) {
         if (hoverTimer.current) clearTimeout(hoverTimer.current.t);
+        const id = target.id;
         hoverTimer.current = { id, t: setTimeout(() => setOpenR((s) => new Set(s).add(id)), 700) };
       }
+    } else if (hoverTimer.current) {
+      clearTimeout(hoverTimer.current.t);
+      hoverTimer.current = null;
     }
   }
 
-  function onDrop(e: DragEvent) {
-    e.preventDefault();
-    if (!drag || !hint) return end();
-    if (hint.type === "root") apply(drag, ROOT, (drag.type === "f" ? draft.kidsF : draft.kidsB)[ROOT]?.length ?? 0);
-    else if (hint.zone === "into") apply(drag, hint.id, (drag.type === "f" ? draft.kidsF : draft.kidsB)[hint.id]?.length ?? 0);
-    else {
-      const parentKey = hint.type === "f" ? draftP.pf[hint.id] : draftP.pb[hint.id];
-      const list = (hint.type === "f" ? draft.kidsF : draft.kidsB)[parentKey] ?? [];
-      const at = list.indexOf(hint.id) + (hint.zone === "after" ? 1 : 0);
-      apply(drag, parentKey, at);
+  function onEnd() {
+    const d = drag;
+    if (d && hint) {
+      if (hint.type === "root") apply(d, ROOT, (d.type === "f" ? draft.kidsF : draft.kidsB)[ROOT]?.length ?? 0);
+      else if (hint.zone === "into") apply(d, hint.id, (d.type === "f" ? draft.kidsF : draft.kidsB)[hint.id]?.length ?? 0);
+      else {
+        const parentKey = hint.type === "f" ? draftP.pf[hint.id] : draftP.pb[hint.id];
+        const list = (hint.type === "f" ? draft.kidsF : draft.kidsB)[parentKey] ?? [];
+        apply(d, parentKey, list.indexOf(hint.id) + (hint.zone === "after" ? 1 : 0));
+      }
     }
     end();
   }
@@ -249,22 +279,12 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
           const h = editable && hint?.type === "f" && hint.id === id ? hint.zone : null;
           return (
             <li key={id}>
-              <div
-                draggable={editable}
-                onDragStart={(e) => {
-                  e.dataTransfer.effectAllowed = "move";
-                  e.dataTransfer.setData("text/plain", id);
-                  setDrag({ type: "f", id });
-                }}
-                onDragEnd={end}
-                onDragOver={editable ? (e) => onOver(e, "f", id) : undefined}
-                onDrop={editable ? onDrop : undefined}
+              <Row
+                uid={editable ? `f:${id}` : null}
                 style={{ paddingLeft: depth * 20 + 6 }}
                 className={cn(
                   "group relative flex min-h-10 items-center gap-2 rounded-lg pr-2",
-                  editable && "cursor-grab active:cursor-grabbing",
                   h === "into" ? "bg-accent/15 ring-1 ring-accent" : "hover:bg-elevated/60",
-                  drag?.id === id && "opacity-40",
                   moved && "shadow-[inset_3px_0_0_var(--color-accent)]",
                 )}
               >
@@ -295,7 +315,7 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
                 {moved && <span className="shrink-0 text-[11px] font-semibold text-accent">Moved</span>}
                 <span className="shrink-0 text-xs text-muted">{count(t, id)}</span>
                 {editable && <RowActions item={{ type: "f", id }} name={f.name} onMove={setMoveDlg} onNudge={nudge} />}
-              </div>
+              </Row>
               {isOpen && <ul>{renderTree(t, id, depth + 1, editable)}</ul>}
             </li>
           );
@@ -306,21 +326,11 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
           const h = editable && hint?.type === "b" && hint.id === id ? hint.zone : null;
           return (
             <li key={id}>
-              <div
-                draggable={editable}
-                onDragStart={(e) => {
-                  e.dataTransfer.effectAllowed = "move";
-                  e.dataTransfer.setData("text/plain", id);
-                  setDrag({ type: "b", id });
-                }}
-                onDragEnd={end}
-                onDragOver={editable ? (e) => onOver(e, "b", id) : undefined}
-                onDrop={editable ? onDrop : undefined}
-                style={{ paddingLeft: depth * 20 + 6 + (editable ? 0 : 0) }}
+              <Row
+                uid={editable ? `b:${id}` : null}
+                style={{ paddingLeft: depth * 20 + 6 }}
                 className={cn(
                   "group relative flex min-h-10 items-center gap-2 rounded-lg pr-2 hover:bg-elevated/60",
-                  editable && "cursor-grab active:cursor-grabbing",
-                  drag?.id === id && "opacity-40",
                   moved && "shadow-[inset_3px_0_0_var(--color-accent)]",
                 )}
               >
@@ -340,7 +350,7 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
                 <span className="hidden max-w-40 shrink-0 truncate text-xs text-muted xl:block">{b.domain}</span>
                 {moved && <span className="shrink-0 text-[11px] font-semibold text-accent">Moved</span>}
                 {editable && <RowActions item={{ type: "b", id }} name={b.title} onMove={setMoveDlg} onNudge={nudge} />}
-              </div>
+              </Row>
             </li>
           );
         })}
@@ -349,25 +359,7 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
   }
 
   const homeRow = (editable: boolean) => (
-    <div
-      onDragOver={
-        editable
-          ? (e) => {
-              if (!drag) return;
-              e.preventDefault();
-              if (hint?.type !== "root") setHint({ type: "root", id: ROOT, zone: "into" });
-            }
-          : undefined
-      }
-      onDrop={editable ? onDrop : undefined}
-      className={cn(
-        "mb-1 flex min-h-10 items-center gap-2 rounded-lg px-2 text-sm font-semibold",
-        editable && hint?.type === "root" ? "bg-accent/15 ring-1 ring-accent" : "text-muted",
-      )}
-    >
-      <Home className="h-4 w-4" /> Home
-      {editable && drag && <span className="ml-auto text-xs font-normal">Drop here for top level</span>}
-    </div>
+    <RootRow editable={editable} active={editable && hint?.type === "root"} dragging={!!drag} />
   );
 
   const changesLabel = dirty
@@ -424,10 +416,27 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
               <span className="lg:hidden">Use ⇄ to move, ↑ ↓ to reorder.</span>
             </span>
           </header>
-          <div className="pane-body" onDragLeave={(e) => e.currentTarget === e.target && setHint(null)}>
-            {homeRow(true)}
-            <ul>{renderTree(draft, ROOT, 0, true)}</ul>
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={pointerWithin}
+            onDragStart={onStart}
+            onDragMove={onMove}
+            onDragEnd={onEnd}
+            onDragCancel={end}
+          >
+            <div className={cn("pane-body", drag && "select-none")}>
+              {homeRow(true)}
+              <ul>{renderTree(draft, ROOT, 0, true)}</ul>
+            </div>
+            <DragOverlay dropAnimation={null}>
+              {drag && (
+                <div className="flex max-w-xs items-center gap-2 rounded-lg border border-accent bg-elevated px-3 py-2 text-sm font-semibold shadow-2xl shadow-black/60">
+                  {drag.type === "f" ? <Folder className="h-4 w-4 text-accent" /> : <span className="h-2 w-2 rounded-full bg-accent" />}
+                  <span dir="auto" className="truncate">{drag.type === "f" ? byF.get(drag.id)?.name : byB.get(drag.id)?.title}</span>
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
         </section>
       </div>
 
@@ -452,6 +461,55 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
 
 /* ------------------------------------------------------------------ */
 
+const parseUid = (uid: string): Item | null => {
+  const [t, id] = uid.split(":");
+  return (t === "f" || t === "b") && id ? { type: t, id } : null;
+};
+
+/** A tree row. In the Edit pane (uid set) the whole row is draggable and a drop target. */
+function Row({ uid, children, className, style }: { uid: string | null; children: ReactNode; className: string; style: CSSProperties }) {
+  if (!uid) return <div className={className} style={style}>{children}</div>;
+  return <DraggableRow uid={uid} className={className} style={style}>{children}</DraggableRow>;
+}
+
+function DraggableRow({ uid, children, className, style }: { uid: string; children: ReactNode; className: string; style: CSSProperties }) {
+  const drag = useDraggable({ id: uid });
+  const drop = useDroppable({ id: uid });
+  return (
+    <div
+      ref={(el) => {
+        drag.setNodeRef(el);
+        drop.setNodeRef(el);
+      }}
+      {...drag.listeners}
+      style={style}
+      className={cn(className, "cursor-grab select-none active:cursor-grabbing", drag.isDragging && "opacity-40")}
+    >
+      {children}
+    </div>
+  );
+}
+
+function RootRow({ editable, active, dragging }: { editable: boolean; active: boolean; dragging: boolean }) {
+  const content = (
+    <>
+      <Home className="h-4 w-4" /> Home
+      {editable && dragging && <span className="ml-auto text-xs font-normal">Drop here for top level</span>}
+    </>
+  );
+  const cls = cn(
+    "mb-1 flex min-h-10 items-center gap-2 rounded-lg px-2 text-sm font-semibold",
+    active ? "bg-accent/15 text-text ring-1 ring-accent" : "text-muted",
+  );
+  if (!editable) return <div className={cls}>{content}</div>;
+  return <DroppableRoot className={cls}>{content}</DroppableRoot>;
+}
+
+function DroppableRoot({ className, children }: { className: string; children: ReactNode }) {
+  const { setNodeRef } = useDroppable({ id: ROOT });
+  return <div ref={setNodeRef} className={className}>{children}</div>;
+}
+
 function RowActions({
   item,
   name,
@@ -465,7 +523,11 @@ function RowActions({
 }) {
   const btn = "grid h-8 w-8 place-items-center rounded-md text-muted hover:bg-elevated hover:text-text";
   return (
-    <span className="flex shrink-0 items-center" onMouseDown={(e) => e.stopPropagation()}>
+    <span
+      className="flex shrink-0 items-center"
+      onMouseDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+    >
       <button type="button" className={btn} aria-label={`Move ${name} up`} onClick={() => onNudge(item, -1)}>
         <ArrowUp className="h-4 w-4" />
       </button>
