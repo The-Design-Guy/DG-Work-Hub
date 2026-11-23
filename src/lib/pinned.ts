@@ -16,4 +16,5 @@ const pin = (id: string, title: string, url: string): BookmarkView => ({
 export const pinnedLinks: BookmarkView[] = [
   pin("p1", "GitHub repos", "https://github.com/The-Design-Guy?tab=repositories"),
   pin("p2", "Vercel projects", "https://vercel.com/atlas-zb-project"),
+  pin("p3", "To-Do 2026", "https://trello.com/b/qgVUTsn7/to-do-2026"),
 ];
