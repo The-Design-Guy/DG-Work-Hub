@@ -3,13 +3,13 @@
 import * as DM from "@radix-ui/react-dropdown-menu";
 import Link from "next/link";
 import { ChevronDown, Folder, FolderOpen } from "lucide-react";
-import type { PinnedFolder } from "@/lib/data";
+import type { TopItemView } from "@/lib/data";
 import { buttonClass } from "./ui/button";
 
 const item = "flex min-h-9 cursor-pointer select-none items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm outline-none data-[highlighted]:bg-surface";
 
 /** A folder pinned to the top bar: a chip that opens a menu of its links. */
-export function PinnedFolderMenu({ folder }: { folder: PinnedFolder }) {
+export function PinnedFolderMenu({ folder }: { folder: TopItemView }) {
   return (
     <DM.Root modal={false}>
       <DM.Trigger asChild>
@@ -20,7 +20,7 @@ export function PinnedFolderMenu({ folder }: { folder: PinnedFolder }) {
           ) : (
             <Folder className="h-4 w-4 text-accent" />
           )}
-          <span dir="auto">{folder.name}</span>
+          <span dir="auto">{folder.title}</span>
           <ChevronDown className="h-3.5 w-3.5 text-muted" />
         </button>
       </DM.Trigger>
@@ -69,7 +69,7 @@ export function PinnedFolderMenu({ folder }: { folder: PinnedFolder }) {
           ))}
           <DM.Separator className="my-1 h-px bg-line" />
           <DM.Item asChild>
-            <Link href={`/f/${folder.id}`} className={`${item} text-muted`}>
+            <Link href={`/f/${folder.folderId}`} className={`${item} text-muted`}>
               <FolderOpen className="h-4 w-4 shrink-0" />
               Open folder
             </Link>

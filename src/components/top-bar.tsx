@@ -4,26 +4,25 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { FolderLite } from "@/lib/folder-options";
-import type { PinnedFolder } from "@/lib/data";
+import type { TopItemView } from "@/lib/data";
+import { TopBarEditor } from "./top-bar-editor";
 import { PinnedFolderMenu } from "./pinned-folder";
 import { useEffect, useRef, useState } from "react";
-import { FolderPlus, Plus, Search } from "lucide-react";
-import type { BookmarkView } from "@/lib/types";
+import { FolderPlus, Pencil, Plus, Search } from "lucide-react";
 import { Button, buttonClass } from "./ui/button";
 import { NavMenu } from "./nav-menu";
 import { AddBookmarkDialog, NewFolderDialog } from "./dialogs";
 
 export function TopBar({
   user,
-  pinned,
+  items,
   folders,
-  pinnedFolders,
 }: {
   user: { name: string; email: string; image?: string | null };
-  pinned: BookmarkView[];
+  items: TopItemView[];
   folders: FolderLite[];
-  pinnedFolders: PinnedFolder[];
 }) {
+  const [editBar, setEditBar] = useState(false);
   const pathname = usePathname();
   const currentFolder = pathname.match(/^\/f\/([0-9a-f-]{36})/i)?.[1] ?? null;
   const searchRef = useRef<HTMLInputElement>(null);
@@ -103,32 +102,46 @@ export function TopBar({
         </div>
       </div>
 
-      {(pinned.length > 0 || pinnedFolders.length > 0) && (
-        <nav aria-label="Pinned links" className="mx-auto max-w-[1440px] px-4 pb-3 sm:px-8">
-          <ul className="flex gap-2 overflow-x-auto [scrollbar-width:none]">
-            {pinned.map((p) => (
-              <li key={p.id} className="shrink-0">
+      <nav aria-label="Top bar links" className="mx-auto max-w-[1440px] px-4 pb-3 sm:px-8">
+        <ul className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none]">
+          {items.map((it) => (
+            <li key={it.id} className="shrink-0">
+              {it.kind === "folder" ? (
+                <PinnedFolderMenu folder={it} />
+              ) : (
                 <a
-                  href={p.url}
+                  href={it.url ?? "#"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={buttonClass("ghost", "sm", "border border-line/70 bg-surface/60 text-text/90")}
                 >
-                  <span className="grid h-5 w-5 place-items-center rounded-md bg-elevated text-[11px] font-semibold">
-                    {p.title.charAt(0)}
-                  </span>
-                  {p.title}
+                  {it.iconUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={it.iconUrl} alt="" className="h-5 w-5 rounded-md object-contain" />
+                  ) : (
+                    <span className="grid h-5 w-5 place-items-center rounded-md bg-elevated text-[11px] font-semibold">
+                      {it.title.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  <span dir="auto">{it.title}</span>
                 </a>
-              </li>
-            ))}
-            {pinnedFolders.map((f) => (
-              <li key={f.id} className="shrink-0">
-                <PinnedFolderMenu folder={f} />
-              </li>
-            ))}
-          </ul>
-        </nav>
-      )}
+              )}
+            </li>
+          ))}
+          <li className="shrink-0">
+            <button
+              type="button"
+              onClick={() => setEditBar(true)}
+              aria-label="Edit top bar"
+              title="Edit top bar"
+              className="grid h-9 w-9 place-items-center rounded-xl border border-dashed border-line text-muted hover:border-accent hover:text-accent"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          </li>
+        </ul>
+      </nav>
+      <TopBarEditor open={editBar} onOpenChange={setEditBar} items={items} folders={folders} />
 
       <NewFolderDialog open={newFolder} onOpenChange={setNewFolder} folders={folders} defaultParentId={currentFolder} />
       <AddBookmarkDialog open={addBookmark} onOpenChange={setAddBookmark} folders={folders} defaultFolderId={currentFolder} />

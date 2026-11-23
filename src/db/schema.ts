@@ -131,8 +131,6 @@ export const folder = pgTable(
     iconImageId: uuid("icon_image_id").references(() => image.id, { onDelete: "set null" }),
     /** Set when its Launch Workspace is opened. Only used for sorting. */
     lastLaunchedAt: timestamp("last_launched_at", { withTimezone: true }),
-    /** Pinned folders show as dropdowns in the top bar (ordered by pin time). */
-    pinnedAt: timestamp("pinned_at", { withTimezone: true }),
     sortOrder: doublePrecision("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -184,3 +182,26 @@ export const bookmark = pgTable(
 
 export type Folder = typeof folder.$inferSelect;
 export type Bookmark = typeof bookmark.$inferSelect;
+
+/**
+ * The editable top bar: plain links, and folders shown as dropdowns.
+ * title/icon override the folder's own name/icon when set.
+ */
+export const topItem = pgTable(
+  "top_item",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["link", "folder"] }).notNull(),
+    title: text("title"),
+    url: text("url"),
+    folderId: uuid("folder_id").references(() => folder.id, { onDelete: "cascade" }),
+    favicon: text("favicon"),
+    iconImageId: uuid("icon_image_id").references(() => image.id, { onDelete: "set null" }),
+    sortOrder: doublePrecision("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("top_item_owner_idx").on(t.ownerId, t.sortOrder)],
+);

@@ -18,7 +18,7 @@ function folderSelect(ownerId: string) {
     name: folder.name,
     icon: folder.icon,
     isProject: folder.isProject,
-    pinned: sql<boolean>`${folder.pinnedAt} is not null`,
+    pinned: sql<boolean>`exists (select 1 from ${schema.topItem} ti where ti.folder_id = ${outerId} and ti.owner_id = ${ownerId})`,
     coverUrl: sql<string | null>`case when ${folder.coverImageId} is null then null else '/api/images/' || ${folder.coverImageId} end`,
     iconUrl: sql<string | null>`case when ${folder.iconImageId} is null then null else '/api/images/' || ${folder.iconImageId} end`,
     bookmarkCount: sql<number>`(select count(*)::int from ${bookmark} b
@@ -201,42 +201,76 @@ export async function getTrash(ownerId: string): Promise<TrashBatch[]> {
   return [...map.values()].slice(0, 300);
 }
 
-export type PinnedFolder = {
+export type TopItemView = {
   id: string;
-  name: string;
+  kind: "link" | "folder";
+  /** What shows in the bar (custom title, or the folder's name). */
+  title: string;
+  customTitle: string | null;
+  url: string | null;
+  folderId: string | null;
   iconUrl: string | null;
+  hasCustomIcon: boolean;
   links: { id: string; title: string; url: string; domain: string; faviconUrl: string | null }[];
   subfolders: { id: string; name: string }[];
 };
 
-/** Folders pinned to the top bar, with what's directly inside them. */
-export async function getPinnedFolders(ownerId: string): Promise<PinnedFolder[]> {
-  const pins = await db
-    .select({ id: folder.id, name: folder.name, iconImageId: folder.iconImageId })
-    .from(folder)
-    .where(and(eq(folder.ownerId, ownerId), isNull(folder.deletedAt), sql`${folder.pinnedAt} is not null`))
-    .orderBy(asc(folder.pinnedAt));
-  if (!pins.length) return [];
-  const ids = pins.map((p) => p.id);
-  const [links, subs] = await Promise.all([
-    db
-      .select({ id: bookmark.id, folderId: bookmark.folderId, title: bookmark.title, url: bookmark.url, domain: bookmark.domain, faviconUrl: bookmark.faviconUrl })
-      .from(bookmark)
-      .where(and(eq(bookmark.ownerId, ownerId), isNull(bookmark.deletedAt), inArray(bookmark.folderId, ids)))
-      .orderBy(asc(bookmark.sortOrder), asc(bookmark.createdAt)),
-    db
-      .select({ id: folder.id, parentId: folder.parentId, name: folder.name })
-      .from(folder)
-      .where(and(eq(folder.ownerId, ownerId), isNull(folder.deletedAt), inArray(folder.parentId, ids)))
-      .orderBy(asc(folder.sortOrder), asc(folder.createdAt)),
-  ]);
-  return pins.map((p) => ({
-    id: p.id,
-    name: p.name,
-    iconUrl: p.iconImageId ? `/api/images/${p.iconImageId}` : null,
+/** The editable top bar, in order. Folders in Trash are left out. */
+export async function getTopBar(ownerId: string): Promise<TopItemView[]> {
+  const { topItem } = schema;
+  const items = await db
+    .select({
+      id: topItem.id,
+      kind: topItem.kind,
+      title: topItem.title,
+      url: topItem.url,
+      folderId: topItem.folderId,
+      favicon: topItem.favicon,
+      iconImageId: topItem.iconImageId,
+      folderName: folder.name,
+      folderIcon: folder.iconImageId,
+      folderDeleted: folder.deletedAt,
+    })
+    .from(topItem)
+    .leftJoin(folder, eq(folder.id, topItem.folderId))
+    .where(eq(topItem.ownerId, ownerId))
+    .orderBy(asc(topItem.sortOrder), asc(topItem.createdAt));
+  const live = items.filter((i) => i.kind === "link" || (i.folderId && !i.folderDeleted));
+  const ids = live.flatMap((i) => (i.kind === "folder" && i.folderId ? [i.folderId] : []));
+
+  const [links, subs] = ids.length
+    ? await Promise.all([
+        db
+          .select({ id: bookmark.id, folderId: bookmark.folderId, title: bookmark.title, url: bookmark.url, domain: bookmark.domain, faviconUrl: bookmark.faviconUrl })
+          .from(bookmark)
+          .where(and(eq(bookmark.ownerId, ownerId), isNull(bookmark.deletedAt), inArray(bookmark.folderId, ids)))
+          .orderBy(asc(bookmark.sortOrder), asc(bookmark.createdAt)),
+        db
+          .select({ id: folder.id, parentId: folder.parentId, name: folder.name })
+          .from(folder)
+          .where(and(eq(folder.ownerId, ownerId), isNull(folder.deletedAt), inArray(folder.parentId, ids)))
+          .orderBy(asc(folder.sortOrder), asc(folder.createdAt)),
+      ])
+    : [[], []];
+
+  return live.map((i) => ({
+    id: i.id,
+    kind: i.kind,
+    title: i.title ?? i.folderName ?? "Link",
+    customTitle: i.title,
+    url: i.url,
+    folderId: i.folderId,
+    iconUrl: i.iconImageId
+      ? `/api/images/${i.iconImageId}`
+      : i.kind === "link"
+        ? i.favicon
+        : i.folderIcon
+          ? `/api/images/${i.folderIcon}`
+          : null,
+    hasCustomIcon: !!i.iconImageId,
     links: links
-      .filter((l) => l.folderId === p.id)
+      .filter((l) => l.folderId === i.folderId)
       .map((l) => ({ id: l.id, title: l.title, url: l.url, domain: l.domain, faviconUrl: l.faviconUrl })),
-    subfolders: subs.filter((s) => s.parentId === p.id).map((s) => ({ id: s.id, name: s.name })),
+    subfolders: subs.filter((x) => x.parentId === i.folderId).map((x) => ({ id: x.id, name: x.name })),
   }));
 }

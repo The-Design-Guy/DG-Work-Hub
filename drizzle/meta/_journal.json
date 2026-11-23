@@ -50,6 +50,13 @@
       "when": 1795396912003,
       "tag": "0006_pinned_folders",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795397132065,
+      "tag": "0007_top_bar",
+      "breakpoints": true
     }
   ]
 }

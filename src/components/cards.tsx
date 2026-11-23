@@ -6,6 +6,7 @@ import { removeFolderCover, setFolderCover, setPinned, setProject, subfoldersToP
 import { restoreBatch, trashBookmark, trashFolder } from "@/app/actions/trash";
 import { Dialog } from "./ui/dialog";
 import { IconDialog } from "./icon-dialog";
+import { folderDomains, removeFolderIcon, setFolderIcon } from "@/app/actions/icons";
 import { EditBookmarkDialog, RenameFolderDialog } from "./dialogs";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
@@ -250,9 +251,11 @@ export function FolderCard({ folder, variant = "card" }: { folder: FolderView; v
         <IconDialog
           open={iconOpen}
           onOpenChange={setIconOpen}
-          folderId={folder.id}
-          folderName={folder.name}
+          name={folder.name}
           hasIcon={!!iconUrl}
+          loadSuggestions={() => folderDomains(folder.id)}
+          save={(form) => setFolderIcon(folder.id, form)}
+          remove={() => removeFolderIcon(folder.id)}
           onPreview={setIconUrl}
         />
         <Dialog

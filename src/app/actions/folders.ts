@@ -258,11 +258,23 @@ export async function renameFolder(id: string, name: string) {
 export async function setPinned(folderId: string, value: boolean) {
   const user = await requireUser();
   if (!z.uuid().safeParse(folderId).success) return { ok: false as const };
-  const rows = await db
-    .update(folder)
-    .set({ pinnedAt: value ? new Date() : null })
-    .where(and(eq(folder.id, folderId), eq(folder.ownerId, user.id), isNull(folder.deletedAt)))
-    .returning({ id: folder.id });
+  if (!(await ownedFolder(user.id, folderId))) return { ok: false as const };
+  const { topItem } = schema;
+  if (value) {
+    const [exists] = await db
+      .select({ id: topItem.id })
+      .from(topItem)
+      .where(and(eq(topItem.ownerId, user.id), eq(topItem.folderId, folderId)));
+    if (!exists) {
+      const [m] = await db
+        .select({ m: sql<number>`coalesce(max(${topItem.sortOrder}), 0)` })
+        .from(topItem)
+        .where(eq(topItem.ownerId, user.id));
+      await db.insert(topItem).values({ ownerId: user.id, kind: "folder", folderId, sortOrder: Number(m?.m ?? 0) + 1 });
+    }
+  } else {
+    await db.delete(topItem).where(and(eq(topItem.ownerId, user.id), eq(topItem.folderId, folderId)));
+  }
   revalidatePath("/", "layout");
-  return { ok: rows.length === 1 };
+  return { ok: true as const };
 }

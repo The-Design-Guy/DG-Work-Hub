@@ -3,30 +3,37 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Globe, ImageUp, Loader2, Trash2 } from "lucide-react";
-import { findFavicons, folderDomains, removeFolderIcon, setFolderIcon } from "@/app/actions/icons";
+import { findFavicons } from "@/app/actions/icons";
 import { squareImage } from "@/lib/resize-image";
 import { Dialog, inputClass } from "./ui/dialog";
 import { Button, cn } from "./ui/button";
 
 type Candidate = { dataUrl: string; label: string };
 
+/** Pick an icon: a website's favicon or an uploaded image, cropped to a square. Used for folders and top-bar items. */
 export function IconDialog({
   open,
   onOpenChange,
-  folderId,
-  folderName,
+  name,
   hasIcon,
+  initialSite,
+  loadSuggestions,
+  save: saveIcon,
+  remove,
   onPreview,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  folderId: string;
-  folderName: string;
+  name: string;
   hasIcon: boolean;
-  onPreview: (url: string | null) => void;
+  initialSite?: string;
+  loadSuggestions?: () => Promise<string[]>;
+  save: (form: FormData) => Promise<{ ok: boolean; error?: string }>;
+  remove?: () => Promise<unknown>;
+  onPreview?: (url: string | null) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [site, setSite] = useState("");
+  const [site, setSite] = useState(initialSite ?? "");
   const [domains, setDomains] = useState<string[]>([]);
   const [found, setFound] = useState<{ site: string; candidates: Candidate[] } | null>(null);
   const [searching, setSearching] = useState(false);
@@ -34,13 +41,14 @@ export function IconDialog({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !loadSuggestions) return;
     let alive = true;
-    folderDomains(folderId).then((d) => alive && setDomains(d));
+    loadSuggestions().then((d) => alive && setDomains(d));
     return () => {
       alive = false;
     };
-  }, [open, folderId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   async function search(value: string) {
     setSite(value);
@@ -62,9 +70,9 @@ export function IconDialog({
       const form = new FormData();
       form.set("file", blob, "icon");
       form.set("size", String(size));
-      const res = await setFolderIcon(folderId, form);
-      if (!res.ok) throw new Error(res.error);
-      onPreview(local);
+      const res = await saveIcon(form);
+      if (!res.ok) throw new Error(res.error ?? "Couldn't save the icon.");
+      onPreview?.(local);
       toast.success("Icon updated");
       onOpenChange(false);
     } catch (e) {
@@ -75,7 +83,7 @@ export function IconDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title={`Icon for “${folderName}”`} description="Use a website's icon, or upload an image. It's cropped to a square.">
+    <Dialog open={open} onOpenChange={onOpenChange} title={`Icon for “${name}”`} description="Use a website's icon, or upload an image. It's cropped to a square.">
       <div className="space-y-6">
         <section>
           <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Globe className="h-4 w-4 text-muted" /> From a website</h3>
@@ -146,14 +154,14 @@ export function IconDialog({
 
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
 
-        <div className={cn("flex items-center gap-2 border-t border-line pt-4", hasIcon ? "justify-between" : "justify-end")}>
-          {hasIcon && (
+        <div className={cn("flex items-center gap-2 border-t border-line pt-4", hasIcon && remove ? "justify-between" : "justify-end")}>
+          {hasIcon && remove && (
             <Button
               variant="ghost"
               disabled={saving}
               onClick={async () => {
-                await removeFolderIcon(folderId);
-                onPreview(null);
+                await remove();
+                onPreview?.(null);
                 toast("Icon removed");
                 onOpenChange(false);
               }}
