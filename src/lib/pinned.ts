@@ -11,6 +11,8 @@ const pin = (id: string, title: string, url: string): BookmarkView => ({
   description: null,
   thumbnailUrl: null,
   launchOnStart: false,
+  updatedAt: new Date(0),
+  lastLaunchedAt: null,
 });
 
 export const pinnedLinks: BookmarkView[] = [

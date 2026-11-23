@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { FolderLite } from "@/lib/folder-options";
+import type { PinnedFolder } from "@/lib/data";
+import { PinnedFolderMenu } from "./pinned-folder";
 import { useEffect, useRef, useState } from "react";
 import { FolderPlus, Plus, Search } from "lucide-react";
 import type { BookmarkView } from "@/lib/types";
@@ -15,10 +17,12 @@ export function TopBar({
   user,
   pinned,
   folders,
+  pinnedFolders,
 }: {
   user: { name: string; email: string; image?: string | null };
   pinned: BookmarkView[];
   folders: FolderLite[];
+  pinnedFolders: PinnedFolder[];
 }) {
   const pathname = usePathname();
   const currentFolder = pathname.match(/^\/f\/([0-9a-f-]{36})/i)?.[1] ?? null;
@@ -99,7 +103,7 @@ export function TopBar({
         </div>
       </div>
 
-      {pinned.length > 0 && (
+      {(pinned.length > 0 || pinnedFolders.length > 0) && (
         <nav aria-label="Pinned links" className="mx-auto max-w-[1440px] px-4 pb-3 sm:px-8">
           <ul className="flex gap-2 overflow-x-auto [scrollbar-width:none]">
             {pinned.map((p) => (
@@ -115,6 +119,11 @@ export function TopBar({
                   </span>
                   {p.title}
                 </a>
+              </li>
+            ))}
+            {pinnedFolders.map((f) => (
+              <li key={f.id} className="shrink-0">
+                <PinnedFolderMenu folder={f} />
               </li>
             ))}
           </ul>

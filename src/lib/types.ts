@@ -8,9 +8,13 @@ export type FolderView = {
   coverUrl: string | null;
   iconUrl: string | null;
   isProject: boolean;
+  pinned: boolean;
   bookmarkCount: number;
   launchCount: number;
   subfolderCount: number;
+  /** Latest change to the folder or anything inside it, at any depth. */
+  lastModified: Date | string | null;
+  lastLaunchedAt: Date | string | null;
 };
 
 export type BookmarkView = {
@@ -23,6 +27,10 @@ export type BookmarkView = {
   description: string | null;
   thumbnailUrl: string | null;
   launchOnStart: boolean;
+  updatedAt: Date | string;
+  lastLaunchedAt: Date | string | null;
 };
 
 export type Crumb = { id: string | null; name: string };
+
+export type Sort = "custom" | "az" | "za" | "modified" | "launched";

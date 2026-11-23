@@ -129,6 +129,10 @@ export const folder = pgTable(
     coverImageId: uuid("cover_image_id").references(() => image.id, { onDelete: "set null" }),
     /** Square icon (a site's favicon or an uploaded image, cropped 1:1). */
     iconImageId: uuid("icon_image_id").references(() => image.id, { onDelete: "set null" }),
+    /** Set when its Launch Workspace is opened. Only used for sorting. */
+    lastLaunchedAt: timestamp("last_launched_at", { withTimezone: true }),
+    /** Pinned folders show as dropdowns in the top bar (ordered by pin time). */
+    pinnedAt: timestamp("pinned_at", { withTimezone: true }),
     sortOrder: doublePrecision("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -161,6 +165,8 @@ export const bookmark = pgTable(
     sortOrder: doublePrecision("sort_order").notNull().default(0),
     launchOnStart: boolean("launch_on_start").notNull().default(false),
     launchOrder: doublePrecision("launch_order").notNull().default(0),
+    /** Set when the link is opened from the app or launched with its workspace. Only used for sorting. */
+    lastLaunchedAt: timestamp("last_launched_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),

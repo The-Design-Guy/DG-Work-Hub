@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { BookmarkView, Crumb, FolderView } from "./types";
 
@@ -18,6 +18,7 @@ function folderSelect(ownerId: string) {
     name: folder.name,
     icon: folder.icon,
     isProject: folder.isProject,
+    pinned: sql<boolean>`${folder.pinnedAt} is not null`,
     coverUrl: sql<string | null>`case when ${folder.coverImageId} is null then null else '/api/images/' || ${folder.coverImageId} end`,
     iconUrl: sql<string | null>`case when ${folder.iconImageId} is null then null else '/api/images/' || ${folder.iconImageId} end`,
     bookmarkCount: sql<number>`(select count(*)::int from ${bookmark} b
@@ -26,6 +27,19 @@ function folderSelect(ownerId: string) {
       where b.folder_id = ${outerId} and b.owner_id = ${ownerId} and b.deleted_at is null and b.launch_on_start)`,
     subfolderCount: sql<number>`(select count(*)::int from ${folder} c
       where c.parent_id = ${outerId} and c.owner_id = ${ownerId} and c.deleted_at is null)`,
+    lastModified: sql<string | null>`(
+      with recursive t(id) as (
+        select ${outerId}
+        union all
+        select c.id from ${folder} c join t on c.parent_id = t.id
+        where c.owner_id = ${ownerId} and c.deleted_at is null
+      )
+      select greatest(
+        (select max(f2.updated_at) from ${folder} f2 where f2.id in (select id from t)),
+        (select max(b.updated_at) from ${bookmark} b
+          where b.folder_id in (select id from t) and b.owner_id = ${ownerId} and b.deleted_at is null)
+      ))`,
+    lastLaunchedAt: folder.lastLaunchedAt,
   };
 }
 
@@ -39,6 +53,8 @@ const bookmarkSelect = {
   description: bookmark.description,
   thumbnailUrl: bookmark.thumbnailUrl,
   launchOnStart: bookmark.launchOnStart,
+  updatedAt: bookmark.updatedAt,
+  lastLaunchedAt: bookmark.lastLaunchedAt,
 };
 
 async function childFolders(ownerId: string, parentId: string | null): Promise<FolderView[]> {
@@ -183,4 +199,44 @@ export async function getTrash(ownerId: string): Promise<TrashBatch[]> {
     b.top.push({ type: r.type, name: r.name });
   }
   return [...map.values()].slice(0, 300);
+}
+
+export type PinnedFolder = {
+  id: string;
+  name: string;
+  iconUrl: string | null;
+  links: { id: string; title: string; url: string; domain: string; faviconUrl: string | null }[];
+  subfolders: { id: string; name: string }[];
+};
+
+/** Folders pinned to the top bar, with what's directly inside them. */
+export async function getPinnedFolders(ownerId: string): Promise<PinnedFolder[]> {
+  const pins = await db
+    .select({ id: folder.id, name: folder.name, iconImageId: folder.iconImageId })
+    .from(folder)
+    .where(and(eq(folder.ownerId, ownerId), isNull(folder.deletedAt), sql`${folder.pinnedAt} is not null`))
+    .orderBy(asc(folder.pinnedAt));
+  if (!pins.length) return [];
+  const ids = pins.map((p) => p.id);
+  const [links, subs] = await Promise.all([
+    db
+      .select({ id: bookmark.id, folderId: bookmark.folderId, title: bookmark.title, url: bookmark.url, domain: bookmark.domain, faviconUrl: bookmark.faviconUrl })
+      .from(bookmark)
+      .where(and(eq(bookmark.ownerId, ownerId), isNull(bookmark.deletedAt), inArray(bookmark.folderId, ids)))
+      .orderBy(asc(bookmark.sortOrder), asc(bookmark.createdAt)),
+    db
+      .select({ id: folder.id, parentId: folder.parentId, name: folder.name })
+      .from(folder)
+      .where(and(eq(folder.ownerId, ownerId), isNull(folder.deletedAt), inArray(folder.parentId, ids)))
+      .orderBy(asc(folder.sortOrder), asc(folder.createdAt)),
+  ]);
+  return pins.map((p) => ({
+    id: p.id,
+    name: p.name,
+    iconUrl: p.iconImageId ? `/api/images/${p.iconImageId}` : null,
+    links: links
+      .filter((l) => l.folderId === p.id)
+      .map((l) => ({ id: l.id, title: l.title, url: l.url, domain: l.domain, faviconUrl: l.faviconUrl })),
+    subfolders: subs.filter((s) => s.parentId === p.id).map((s) => ({ id: s.id, name: s.name })),
+  }));
 }

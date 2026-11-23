@@ -5,12 +5,17 @@ import { EmptyState } from "@/components/empty-state";
 import { buttonClass } from "@/components/ui/button";
 import { getRoot } from "@/lib/data";
 import { requireUser } from "@/lib/session";
-import { getView } from "@/lib/view";
+import { getSort, getView } from "@/lib/view";
+import { sortBookmarks, sortFolders } from "@/lib/sort";
+import { SortMenu } from "@/components/sort-menu";
 import { ViewToggle } from "@/components/view-toggle";
 
 export default async function Home() {
   const user = await requireUser();
-  const [{ projects, library, bookmarks }, view] = await Promise.all([getRoot(user.id), getView()]);
+  const [root, view, sort] = await Promise.all([getRoot(user.id), getView(), getSort()]);
+  const projects = sortFolders(root.projects, sort);
+  const library = sortFolders(root.library, sort);
+  const bookmarks = sortBookmarks(root.bookmarks, sort);
 
   if (!projects.length && !library.length && !bookmarks.length) {
     return (
@@ -33,6 +38,7 @@ export default async function Home() {
         <div className="flex items-start justify-between gap-4">
           <h1 id="projects-h" className="text-3xl font-bold tracking-tight sm:text-4xl">Projects</h1>
           <div className="flex items-center gap-2">
+          <SortMenu sort={sort} />
           <ViewToggle view={view} />
           <Link href="/organize" className={buttonClass("secondary", "md")}>
             <FolderTree className="h-4.5 w-4.5" />

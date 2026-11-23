@@ -254,3 +254,15 @@ export async function renameFolder(id: string, name: string) {
   revalidatePath("/", "layout");
   return rows.length ? { ok: true as const } : { ok: false as const, error: "Folder not found." };
 }
+
+export async function setPinned(folderId: string, value: boolean) {
+  const user = await requireUser();
+  if (!z.uuid().safeParse(folderId).success) return { ok: false as const };
+  const rows = await db
+    .update(folder)
+    .set({ pinnedAt: value ? new Date() : null })
+    .where(and(eq(folder.id, folderId), eq(folder.ownerId, user.id), isNull(folder.deletedAt)))
+    .returning({ id: folder.id });
+  revalidatePath("/", "layout");
+  return { ok: rows.length === 1 };
+}

@@ -36,6 +36,20 @@
       "when": 1795373204115,
       "tag": "0004_folder_icons",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795396819502,
+      "tag": "0005_last_launched",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795396912003,
+      "tag": "0006_pinned_folders",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { removeFolderCover, setFolderCover, setProject, subfoldersToProjects, unpackFolder } from "@/app/actions/folders";
+import { removeFolderCover, setFolderCover, setPinned, setProject, subfoldersToProjects, unpackFolder } from "@/app/actions/folders";
 import { restoreBatch, trashBookmark, trashFolder } from "@/app/actions/trash";
 import { Dialog } from "./ui/dialog";
 import { IconDialog } from "./icon-dialog";
@@ -18,6 +18,8 @@ import {
   Image as ImageIcon,
   ImageOff,
   SquareUser,
+  Pin,
+  PinOff,
   FolderOutput,
   Briefcase,
   Library,
@@ -60,6 +62,13 @@ function undoToast(message: string, batch: string) {
       },
     },
   });
+}
+
+/** Records the open for "Last launched" sorting without delaying navigation. */
+function markOpened(id: string) {
+  try {
+    navigator.sendBeacon(`/api/opened/${id}`);
+  } catch {}
 }
 
 function Favicon({ src, letter, small }: { src: string | null; letter: string; small?: boolean }) {
@@ -204,6 +213,16 @@ export function FolderCard({ folder, variant = "card" }: { folder: FolderView; v
               </MenuItem>
             )}
             <MenuSeparator />
+            <MenuItem
+              icon={folder.pinned ? <PinOff /> : <Pin />}
+              onSelect={async () => {
+                const res = await setPinned(folder.id, !folder.pinned);
+                if (!res.ok) return toast.error("Couldn't update the top bar.");
+                toast.success(folder.pinned ? "Removed from the top bar" : "Pinned to the top bar");
+              }}
+            >
+              {folder.pinned ? "Unpin from top bar" : "Pin to top bar"}
+            </MenuItem>
             <MenuItem icon={<Pencil />} onSelect={() => setRenameOpen(true)}>Rename</MenuItem>
             <MenuItem icon={<ArrowRightLeft />} onSelect={() => router.push(`/organize?focus=${folder.id}`)}>Move / reorder</MenuItem>
             <MenuSeparator />
@@ -386,7 +405,10 @@ export function BookmarkCard({
     <Menu trigger={menuTrigger(`Actions for ${bookmark.title}`)}>
               <MenuItem
                 icon={<ExternalLink />}
-                onSelect={() => window.open(bookmark.url, "_blank", "noopener,noreferrer")}
+                onSelect={() => {
+                  markOpened(bookmark.id);
+                  window.open(bookmark.url, "_blank", "noopener,noreferrer");
+                }}
               >
                 Open
               </MenuItem>
@@ -452,7 +474,15 @@ export function BookmarkCard({
         </span>
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 break-words font-semibold leading-snug">
-            <a href={bookmark.url} target="_blank" rel="noopener noreferrer" dir="auto" className="stretched-link focus-visible:outline-none">
+            <a
+              href={bookmark.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              dir="auto"
+              onClick={() => markOpened(bookmark.id)}
+              onAuxClick={() => markOpened(bookmark.id)}
+              className="stretched-link focus-visible:outline-none"
+            >
               {bookmark.title}
             </a>
           </p>
@@ -505,6 +535,8 @@ export function BookmarkCard({
             href={bookmark.url}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => markOpened(bookmark.id)}
+            onAuxClick={() => markOpened(bookmark.id)}
             className="stretched-link focus-visible:outline-none"
           >
             {bookmark.title}

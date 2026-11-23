@@ -5,11 +5,12 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { Folder as FolderIcon, FolderPlus, FolderTree, Plus, Rocket } from "lucide-react";
 import { setLaunch } from "@/app/actions/bookmarks";
-import type { BookmarkView, FolderView } from "@/lib/types";
+import type { BookmarkView, FolderView, Sort } from "@/lib/types";
 import { BookmarkCard, FolderCard } from "./cards";
 import { Button, buttonClass } from "./ui/button";
 import { EmptyState } from "./empty-state";
 import { ViewToggle } from "./view-toggle";
+import { SortMenu } from "./sort-menu";
 
 const later = (what: string) => toast(`${what} is connected in an upcoming step.`);
 
@@ -88,11 +89,13 @@ export function FolderContents({
   subfolders,
   bookmarks: initial,
   view = "cards",
+  sort = "custom",
 }: {
   folder: FolderView;
   subfolders: FolderView[];
   bookmarks: BookmarkView[];
   view?: View;
+  sort?: Sort;
 }) {
   const { bookmarks, toggle } = useLaunchToggle(initial);
   const launchCount = bookmarks.filter((b) => b.launchOnStart).length;
@@ -119,6 +122,7 @@ export function FolderContents({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+        <SortMenu sort={sort} />
         <ViewToggle view={view} />
         <Link href={`/organize?focus=${folder.id}`} className={buttonClass("secondary", "md", "h-12")}>
           <FolderTree className="h-4.5 w-4.5" /> Organize
