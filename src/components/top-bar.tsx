@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type { FolderLite } from "@/lib/folder-options";
 import { useEffect, useRef, useState } from "react";
 import { FolderPlus, Plus, Search } from "lucide-react";
 import type { BookmarkView } from "@/lib/types";
@@ -12,10 +14,14 @@ import { AddBookmarkDialog, NewFolderDialog } from "./dialogs";
 export function TopBar({
   user,
   pinned,
+  folders,
 }: {
   user: { name: string; email: string; image?: string | null };
   pinned: BookmarkView[];
+  folders: FolderLite[];
 }) {
+  const pathname = usePathname();
+  const currentFolder = pathname.match(/^\/f\/([0-9a-f-]{36})/i)?.[1] ?? null;
   const searchRef = useRef<HTMLInputElement>(null);
   const [newFolder, setNewFolder] = useState(false);
   const [addBookmark, setAddBookmark] = useState(false);
@@ -29,8 +35,17 @@ export function TopBar({
         searchRef.current?.focus();
       }
     }
+    // Empty states and other screens can open these dialogs.
+    const openAdd = () => setAddBookmark(true);
+    const openFolder = () => setNewFolder(true);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("dg:add-bookmark", openAdd);
+    window.addEventListener("dg:new-folder", openFolder);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("dg:add-bookmark", openAdd);
+      window.removeEventListener("dg:new-folder", openFolder);
+    };
   }, []);
 
   return (
@@ -106,8 +121,8 @@ export function TopBar({
         </nav>
       )}
 
-      <NewFolderDialog open={newFolder} onOpenChange={setNewFolder} />
-      <AddBookmarkDialog open={addBookmark} onOpenChange={setAddBookmark} />
+      <NewFolderDialog open={newFolder} onOpenChange={setNewFolder} folders={folders} defaultParentId={currentFolder} />
+      <AddBookmarkDialog open={addBookmark} onOpenChange={setAddBookmark} folders={folders} defaultFolderId={currentFolder} />
     </header>
   );
 }

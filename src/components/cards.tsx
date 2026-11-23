@@ -6,6 +6,8 @@ import { removeFolderCover, setFolderCover, setProject, subfoldersToProjects, un
 import { restoreBatch, trashBookmark, trashFolder } from "@/app/actions/trash";
 import { Dialog } from "./ui/dialog";
 import { IconDialog } from "./icon-dialog";
+import { EditBookmarkDialog, RenameFolderDialog } from "./dialogs";
+import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import { resizeImage } from "@/lib/resize-image";
 import {
@@ -69,11 +71,13 @@ function Favicon({ src, letter }: { src: string | null; letter: string }) {
 
 /* ------------------------------------------------------------------ */
 
-export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?: (a: string) => void }) {
+export function FolderCard({ folder }: { folder: FolderView }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [cover, setCover] = useState(folder.coverUrl);
   const [iconUrl, setIconUrl] = useState(folder.iconUrl);
   const [iconOpen, setIconOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const router = useRouter();
   const [prevIcon, setPrevIcon] = useState(folder.iconUrl);
   if (folder.iconUrl !== prevIcon) {
     setPrevIcon(folder.iconUrl);
@@ -235,8 +239,8 @@ export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?
               </MenuItem>
             )}
             <MenuSeparator />
-            <MenuItem icon={<Pencil />} onSelect={() => onAction?.("rename")}>Rename</MenuItem>
-            <MenuItem icon={<ArrowRightLeft />} onSelect={() => onAction?.("move")}>Move / reorder</MenuItem>
+            <MenuItem icon={<Pencil />} onSelect={() => setRenameOpen(true)}>Rename</MenuItem>
+            <MenuItem icon={<ArrowRightLeft />} onSelect={() => router.push(`/organize?focus=${folder.id}`)}>Move / reorder</MenuItem>
             <MenuSeparator />
             {folder.isProject ? (
               <MenuItem icon={<Library />} onSelect={() => toggleProject(false)}>Move to Library</MenuItem>
@@ -255,6 +259,7 @@ export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?
             <MenuItem icon={<Trash2 />} danger onSelect={askDelete}>Move to Trash</MenuItem>
           </Menu>
         </div>
+        <RenameFolderDialog open={renameOpen} onOpenChange={setRenameOpen} id={folder.id} name={folder.name} />
         <IconDialog
           open={iconOpen}
           onOpenChange={setIconOpen}
@@ -328,13 +333,13 @@ export function FolderCard({ folder, onAction }: { folder: FolderView; onAction?
 export function BookmarkCard({
   bookmark,
   onToggleLaunch,
-  onAction,
 }: {
   bookmark: BookmarkView;
   onToggleLaunch?: (id: string, next: boolean) => void;
-  onAction?: (a: string) => void;
 }) {
   const hue = hueFor(bookmark.domain);
+  const [editOpen, setEditOpen] = useState(false);
+  const router = useRouter();
   const letter = (bookmark.title || bookmark.domain).trim().charAt(0).toUpperCase();
 
   return (
@@ -390,8 +395,13 @@ export function BookmarkCard({
               >
                 Copy link
               </MenuItem>
-              <MenuItem icon={<Pencil />} onSelect={() => onAction?.("edit")}>Edit</MenuItem>
-              <MenuItem icon={<ArrowRightLeft />} onSelect={() => onAction?.("move")}>Move / reorder</MenuItem>
+              <MenuItem icon={<Pencil />} onSelect={() => setEditOpen(true)}>Edit</MenuItem>
+              <MenuItem
+                icon={<ArrowRightLeft />}
+                onSelect={() => router.push(bookmark.folderId ? `/organize?focus=${bookmark.folderId}` : "/organize")}
+              >
+                Move / reorder
+              </MenuItem>
               <MenuSeparator />
               <MenuItem
                 icon={<Trash2 />}
@@ -426,6 +436,7 @@ export function BookmarkCard({
           <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted/90">{bookmark.description}</p>
         )}
       </div>
+      <EditBookmarkDialog open={editOpen} onOpenChange={setEditOpen} bookmark={bookmark} />
     </article>
   );
 }

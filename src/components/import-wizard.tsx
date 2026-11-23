@@ -7,6 +7,7 @@ import { ChevronRight, FileUp, Folder, FolderOpen, Search, Upload } from "lucide
 import { importBookmarks, undoImport } from "@/app/actions/import";
 import { buildPayload, leafIds, parseChromeBookmarks, walk, type TreeNode } from "@/lib/chrome-bookmarks";
 import { urlKey } from "@/lib/url";
+import { folderOptions } from "@/lib/folder-options";
 import { Button, cn } from "./ui/button";
 import { inputClass } from "./ui/dialog";
 
@@ -16,20 +17,6 @@ const MAX_FILE = 25 * 1024 * 1024;
 const MAX_BODY = 3_800_000;
 
 /* ------------------------------------------------------------------ */
-
-function folderOptions(folders: FolderOption[]) {
-  const byParent = new Map<string | null, FolderOption[]>();
-  for (const f of folders) byParent.set(f.parentId, [...(byParent.get(f.parentId) ?? []), f]);
-  const out: { id: string; label: string }[] = [];
-  const visit = (pid: string | null, depth: number) => {
-    for (const f of byParent.get(pid) ?? []) {
-      out.push({ id: f.id, label: `${"   ".repeat(depth)}${depth ? "↳ " : ""}${f.name}` });
-      visit(f.id, depth + 1);
-    }
-  };
-  visit(null, 0);
-  return out;
-}
 
 const today = () => new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 

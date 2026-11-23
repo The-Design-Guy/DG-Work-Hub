@@ -58,7 +58,7 @@ export async function safeFetch(url: string, opts: { maxBytes: number; accept?: 
     const res = await ufetch(current, {
       dispatcher: agent,
       redirect: "manual",
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(6000),
       headers: {
         "user-agent": "Mozilla/5.0 (compatible; DGWorkHub/1.0; +https://dg-work-hub.vercel.app)",
         accept: opts.accept ?? "*/*",

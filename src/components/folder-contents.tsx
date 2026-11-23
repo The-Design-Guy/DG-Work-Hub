@@ -16,7 +16,7 @@ export function FolderGrid({ folders }: { folders: FolderView[] }) {
   return (
     <div className="card-grid card-grid-folders">
       {folders.map((f) => (
-        <FolderCard key={f.id} folder={f} onAction={(a) => later(a === "delete" ? "Trash" : a[0].toUpperCase() + a.slice(1))} />
+        <FolderCard key={f.id} folder={f} />
       ))}
     </div>
   );
@@ -51,7 +51,6 @@ function Cards({ bookmarks, toggle }: { bookmarks: BookmarkView[]; toggle: (id: 
           key={b.id}
           bookmark={b}
           onToggleLaunch={toggle}
-          onAction={(a) => later(a === "delete" ? "Trash" : a[0].toUpperCase() + a.slice(1))}
         />
       ))}
     </div>
@@ -127,8 +126,8 @@ export function FolderContents({
             text="Add your first link to this folder. Mark the ones you work with daily to launch them together."
             action={
               <div className="flex gap-2">
-                <Button variant="primary" onClick={() => later("Add bookmark")}><Plus className="h-4.5 w-4.5" />Add Bookmark</Button>
-                <Button onClick={() => later("New folder")}><FolderPlus className="h-4.5 w-4.5" />Subfolder</Button>
+                <Button variant="primary" onClick={() => window.dispatchEvent(new Event("dg:add-bookmark"))}><Plus className="h-4.5 w-4.5" />Add Bookmark</Button>
+                <Button onClick={() => window.dispatchEvent(new Event("dg:new-folder"))}><FolderPlus className="h-4.5 w-4.5" />Subfolder</Button>
               </div>
             }
           />

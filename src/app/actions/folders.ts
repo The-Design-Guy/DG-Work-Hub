@@ -217,3 +217,40 @@ export async function subfoldersToProjects(folderId: string) {
   revalidatePath("/", "layout");
   return { ok: true as const, projects: kidsF.length, bookmarks: kidsB.length };
 }
+
+const folderInput = z.object({
+  name: z.string().trim().min(1).max(200),
+  parentId: z.uuid().nullable(),
+  isProject: z.boolean(),
+});
+
+export async function createFolder(raw: unknown) {
+  const user = await requireUser();
+  const p = folderInput.safeParse(raw);
+  if (!p.success) return { ok: false as const, error: "Give the folder a name." };
+  const { name, parentId } = p.data;
+  if (parentId && !(await ownedFolder(user.id, parentId))) return { ok: false as const, error: "Parent folder not found." };
+  const [m] = await db
+    .select({ m: sql<number>`coalesce(max(${folder.sortOrder}), 0)` })
+    .from(folder)
+    .where(and(eq(folder.ownerId, user.id), parentId ? eq(folder.parentId, parentId) : isNull(folder.parentId)));
+  const [row] = await db
+    .insert(folder)
+    .values({ ownerId: user.id, parentId, name, isProject: !parentId && p.data.isProject, sortOrder: Number(m?.m ?? 0) + 1 })
+    .returning({ id: folder.id });
+  revalidatePath("/", "layout");
+  return { ok: true as const, id: row.id };
+}
+
+export async function renameFolder(id: string, name: string) {
+  const user = await requireUser();
+  const n = z.string().trim().min(1).max(200).safeParse(name);
+  if (!z.uuid().safeParse(id).success || !n.success) return { ok: false as const, error: "Give the folder a name." };
+  const rows = await db
+    .update(folder)
+    .set({ name: n.data, updatedAt: new Date() })
+    .where(and(eq(folder.id, id), eq(folder.ownerId, user.id), isNull(folder.deletedAt)))
+    .returning({ id: folder.id });
+  revalidatePath("/", "layout");
+  return rows.length ? { ok: true as const } : { ok: false as const, error: "Folder not found." };
+}

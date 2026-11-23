@@ -7,6 +7,7 @@ import { atomic, db, schema } from "@/db";
 import { requireUser } from "@/lib/session";
 import { safeFetch } from "@/lib/safe-fetch";
 import { normalizeUrl } from "@/lib/url";
+import { iconLinks, sniffImage } from "@/lib/page-meta";
 
 const { folder, image, bookmark } = schema;
 
@@ -15,43 +16,6 @@ const { folder, image, bookmark } = schema;
 /* ------------------------------------------------------------------ */
 
 type Candidate = { dataUrl: string; label: string };
-
-function sniffImage(buf: Buffer): string | null {
-  if (buf.length < 8) return null;
-  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
-  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
-  if (buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP") return "image/webp";
-  if (buf.toString("ascii", 0, 3) === "GIF") return "image/gif";
-  if (buf[0] === 0 && buf[1] === 0 && buf[2] === 1 && buf[3] === 0) return "image/x-icon";
-  const head = buf.subarray(0, 600).toString("utf8").trimStart().toLowerCase();
-  if ((head.startsWith("<svg") || head.startsWith("<?xml")) && head.includes("<svg")) return "image/svg+xml";
-  return null;
-}
-
-function attr(tag: string, name: string) {
-  const m = tag.match(new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, "i"));
-  return m ? (m[2] ?? m[3] ?? m[4] ?? "").trim() : null;
-}
-
-function iconLinks(html: string, base: URL) {
-  const out: { href: string; score: number; label: string }[] = [];
-  for (const tag of html.match(/<link\b[^>]*>/gi) ?? []) {
-    const rel = (attr(tag, "rel") ?? "").toLowerCase();
-    const href = attr(tag, "href");
-    if (!href || !/\bicon\b|apple-touch-icon/.test(rel) || rel.includes("mask-icon")) continue;
-    let abs: URL;
-    try {
-      abs = new URL(href, base);
-    } catch {
-      continue;
-    }
-    if (abs.protocol !== "https:" && abs.protocol !== "http:") continue;
-    const size = Number((attr(tag, "sizes") ?? "").split(/x/i)[0]) || (rel.includes("apple-touch-icon") ? 180 : 32);
-    const svg = /\.svg(\?|$)/i.test(abs.pathname) || (attr(tag, "type") ?? "").includes("svg");
-    out.push({ href: abs.href, score: svg ? 1000 : size, label: svg ? "Vector icon" : `${size}px` });
-  }
-  return out;
-}
 
 export async function findFavicons(input: string): Promise<{ ok: true; site: string; candidates: Candidate[] } | { ok: false; error: string }> {
   await requireUser();
