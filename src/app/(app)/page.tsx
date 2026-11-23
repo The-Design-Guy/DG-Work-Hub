@@ -5,10 +5,12 @@ import { EmptyState } from "@/components/empty-state";
 import { buttonClass } from "@/components/ui/button";
 import { getRoot } from "@/lib/data";
 import { requireUser } from "@/lib/session";
+import { getView } from "@/lib/view";
+import { ViewToggle } from "@/components/view-toggle";
 
 export default async function Home() {
   const user = await requireUser();
-  const { projects, library, bookmarks } = await getRoot(user.id);
+  const [{ projects, library, bookmarks }, view] = await Promise.all([getRoot(user.id), getView()]);
 
   if (!projects.length && !library.length && !bookmarks.length) {
     return (
@@ -30,10 +32,13 @@ export default async function Home() {
       <section aria-labelledby="projects-h">
         <div className="flex items-start justify-between gap-4">
           <h1 id="projects-h" className="text-3xl font-bold tracking-tight sm:text-4xl">Projects</h1>
+          <div className="flex items-center gap-2">
+          <ViewToggle view={view} />
           <Link href="/organize" className={buttonClass("secondary", "md")}>
             <FolderTree className="h-4.5 w-4.5" />
             Organize
           </Link>
+          </div>
         </div>
         <p className="mt-1 text-sm text-muted">
           {projects.length
@@ -42,7 +47,7 @@ export default async function Home() {
         </p>
         {projects.length > 0 && (
           <div className="mt-8">
-            <FolderGrid folders={projects} />
+            <FolderGrid folders={projects} view={view} />
           </div>
         )}
       </section>
@@ -54,7 +59,7 @@ export default async function Home() {
             {library.length} {library.length === 1 ? "folder" : "folders"}
           </p>
           <div className="mt-6">
-            <FolderGrid folders={library} />
+            <FolderGrid folders={library} view={view} />
           </div>
         </section>
       )}
@@ -63,7 +68,7 @@ export default async function Home() {
         <section className="mt-14" aria-labelledby="root-links">
           <h2 id="root-links" className="text-2xl font-bold tracking-tight">Links</h2>
           <div className="mt-6">
-            <BookmarkGrid bookmarks={bookmarks} />
+            <BookmarkGrid bookmarks={bookmarks} view={view} />
           </div>
         </section>
       )}

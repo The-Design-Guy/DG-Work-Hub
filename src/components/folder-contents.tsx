@@ -9,10 +9,22 @@ import type { BookmarkView, FolderView } from "@/lib/types";
 import { BookmarkCard, FolderCard } from "./cards";
 import { Button, buttonClass } from "./ui/button";
 import { EmptyState } from "./empty-state";
+import { ViewToggle } from "./view-toggle";
 
 const later = (what: string) => toast(`${what} is connected in an upcoming step.`);
 
-export function FolderGrid({ folders }: { folders: FolderView[] }) {
+type View = "cards" | "list";
+
+export function FolderGrid({ folders, view = "cards" }: { folders: FolderView[]; view?: View }) {
+  if (view === "list") {
+    return (
+      <ul className="list-panel">
+        {folders.map((f) => (
+          <FolderCard key={f.id} folder={f} variant="row" />
+        ))}
+      </ul>
+    );
+  }
   return (
     <div className="card-grid card-grid-folders">
       {folders.map((f) => (
@@ -43,7 +55,16 @@ function useLaunchToggle(initial: BookmarkView[]) {
   return { bookmarks, toggle };
 }
 
-function Cards({ bookmarks, toggle }: { bookmarks: BookmarkView[]; toggle: (id: string, next: boolean) => void }) {
+function Cards({ bookmarks, toggle, view = "cards" }: { bookmarks: BookmarkView[]; toggle: (id: string, next: boolean) => void; view?: View }) {
+  if (view === "list") {
+    return (
+      <ul className="list-panel">
+        {bookmarks.map((b) => (
+          <BookmarkCard key={b.id} bookmark={b} onToggleLaunch={toggle} variant="row" />
+        ))}
+      </ul>
+    );
+  }
   return (
     <div className="card-grid">
       {bookmarks.map((b) => (
@@ -57,19 +78,21 @@ function Cards({ bookmarks, toggle }: { bookmarks: BookmarkView[]; toggle: (id: 
   );
 }
 
-export function BookmarkGrid({ bookmarks: initial }: { bookmarks: BookmarkView[] }) {
+export function BookmarkGrid({ bookmarks: initial, view }: { bookmarks: BookmarkView[]; view?: View }) {
   const { bookmarks, toggle } = useLaunchToggle(initial);
-  return <Cards bookmarks={bookmarks} toggle={toggle} />;
+  return <Cards bookmarks={bookmarks} toggle={toggle} view={view} />;
 }
 
 export function FolderContents({
   folder,
   subfolders,
   bookmarks: initial,
+  view = "cards",
 }: {
   folder: FolderView;
   subfolders: FolderView[];
   bookmarks: BookmarkView[];
+  view?: View;
 }) {
   const { bookmarks, toggle } = useLaunchToggle(initial);
   const launchCount = bookmarks.filter((b) => b.launchOnStart).length;
@@ -96,6 +119,7 @@ export function FolderContents({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+        <ViewToggle view={view} />
         <Link href={`/organize?focus=${folder.id}`} className={buttonClass("secondary", "md", "h-12")}>
           <FolderTree className="h-4.5 w-4.5" /> Organize
         </Link>
@@ -112,14 +136,14 @@ export function FolderContents({
       {subfolders.length > 0 && (
         <section className="mt-10" aria-labelledby="sub-h">
           <h2 id="sub-h" className="section-title">Folders</h2>
-          <FolderGrid folders={subfolders} />
+          <FolderGrid folders={subfolders} view={view} />
         </section>
       )}
 
       <section className="mt-10" aria-labelledby="links-h">
         <h2 id="links-h" className="section-title">Links</h2>
         {bookmarks.length ? (
-          <Cards bookmarks={bookmarks} toggle={toggle} />
+          <Cards bookmarks={bookmarks} toggle={toggle} view={view} />
         ) : (
           <EmptyState
             title="No links here yet"
