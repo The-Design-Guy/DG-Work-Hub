@@ -56,10 +56,9 @@ export function TopBar({
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap sm:gap-4 sm:px-8">
         <Link
           href="/"
-          className="flex shrink-0 items-center gap-2 rounded-xl sm:gap-3 sm:pr-1"
+          className="flex shrink-0 items-center rounded-xl py-1"
           aria-label="Design Guy — The Work Hub, home"
         >
-          <Image src="/brand/dg-head.svg" alt="" width={52} height={52} priority className="h-11 w-11 sm:h-[52px] sm:w-[52px]" />
           <span className="flex flex-col items-start gap-1 sm:gap-1.5">
             <Image
               src="/brand/dg-wordmark.svg"
@@ -67,9 +66,9 @@ export function TopBar({
               width={164}
               height={20}
               priority
-              className="h-4 w-auto sm:h-6 lg:h-7"
+              className="h-5 w-auto sm:h-6 lg:h-7"
             />
-            <span className="font-heading text-[8px] font-medium uppercase leading-none tracking-[0.3em] text-text sm:text-[11px] lg:text-xs">
+            <span className="font-heading text-[9px] font-medium uppercase leading-none tracking-[0.3em] text-text sm:text-[11px] lg:text-xs">
               The Work Hub
             </span>
           </span>
