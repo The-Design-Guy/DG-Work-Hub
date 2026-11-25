@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { removeFolderCover, setFolderCover, setPinned, setProject, subfoldersToProjects, unpackFolder } from "@/app/actions/folders";
+import { removeFolderCover, setFolderCover, setPinned, subfoldersToProjects, unpackFolder } from "@/app/actions/folders";
+import { setItemSpace } from "@/app/actions/spaces";
+import { useSpaces } from "./spaces-context";
 import { restoreBatch, trashBookmark, trashFolder } from "@/app/actions/trash";
 import { Dialog } from "./ui/dialog";
 import { IconDialog } from "./icon-dialog";
@@ -22,8 +24,8 @@ import {
   Pin,
   PinOff,
   FolderOutput,
-  Briefcase,
-  Library,
+  Layers,
+  Check,
   LayoutGrid,
   MoreHorizontal,
   Pencil,
@@ -32,7 +34,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { BookmarkView, FolderView } from "@/lib/types";
-import { Menu, MenuItem, MenuSeparator } from "./ui/menu";
+import { Menu, MenuItem, MenuSeparator, MenuSub } from "./ui/menu";
 import { cn } from "./ui/button";
 
 function hueFor(text: string) {
@@ -63,6 +65,33 @@ function undoToast(message: string, batch: string) {
       },
     },
   });
+}
+
+/** "Move to tab ›" submenu. current = undefined when the item isn't on Home (it moves there). */
+function MoveToTab({ type, id, current }: { type: "folder" | "bookmark"; id: string; current: string | null | undefined }) {
+  const spaces = useSpaces();
+  if (!spaces.length) return null;
+  async function move(spaceId: string | null, label: string) {
+    const res = await setItemSpace(type, id, spaceId);
+    if (!res.ok) return toast.error("Couldn't move it.");
+    toast.success(spaceId ? `Moved to ${label}` : "Removed from its tab");
+  }
+  return (
+    <MenuSub label="Move to tab" icon={<Layers />}>
+      {spaces.map((s) => (
+        <MenuItem key={s.id} onSelect={() => s.id !== current && move(s.id, s.name)}>
+          <span className="flex-1">{s.name}</span>
+          {s.id === current && <Check className="h-4 w-4 text-accent" />}
+        </MenuItem>
+      ))}
+      {current && (
+        <>
+          <MenuSeparator />
+          <MenuItem onSelect={() => move(null, "")}>No tab (All only)</MenuItem>
+        </>
+      )}
+    </MenuSub>
+  );
 }
 
 /** Records the open for "Last launched" sorting without delaying navigation. */
@@ -154,13 +183,13 @@ export function FolderCard({ folder, variant = "card" }: { folder: FolderView; v
 
   function askToProjects() {
     setConfirm({
-      title: "Turn subfolders into projects?",
-      text: `Each of the ${n(folder.subfolderCount, "subfolder", "subfolders")} in “${folder.name}” becomes a project on Home, with everything inside it.${folder.bookmarkCount ? ` ${n(folder.bookmarkCount, "loose link moves", "loose links move")} to Home.` : ""} The empty “${folder.name}” folder goes to Trash.`,
-      cta: "Create projects",
+      title: "Move subfolders to Home?",
+      text: `Each of the ${n(folder.subfolderCount, "subfolder", "subfolders")} in “${folder.name}” becomes a folder on Home (same tab), with everything inside it.${folder.bookmarkCount ? ` ${n(folder.bookmarkCount, "loose link moves", "loose links move")} to Home.` : ""} The empty “${folder.name}” folder goes to Trash.`,
+      cta: "Move to Home",
       run: async () => {
         const res = await subfoldersToProjects(folder.id);
         if (!res.ok) return res.error;
-        toast.success(`${n(res.projects, "project", "projects")} added to Home.`);
+        toast.success(`${n(res.projects, "folder", "folders")} moved to Home.`);
         return null;
       },
     });
@@ -184,11 +213,6 @@ export function FolderCard({ folder, variant = "card" }: { folder: FolderView; v
     });
   }
 
-  async function toggleProject(value: boolean) {
-    const res = await setProject(folder.id, value);
-    if (!res.ok) return toast.error("Couldn't update the folder.");
-    toast.success(value ? (res.moved ? "Moved to Home as a project" : "Now a project") : "Moved to Library");
-  }
 
   async function removeCover() {
     const before = cover;
@@ -227,15 +251,9 @@ export function FolderCard({ folder, variant = "card" }: { folder: FolderView; v
             <MenuItem icon={<Pencil />} onSelect={() => setRenameOpen(true)}>Rename</MenuItem>
             <MenuItem icon={<ArrowRightLeft />} onSelect={() => router.push(`/organize?focus=${folder.id}`)}>Move / reorder</MenuItem>
             <MenuSeparator />
-            {folder.isProject ? (
-              <MenuItem icon={<Library />} onSelect={() => toggleProject(false)}>Move to Library</MenuItem>
-            ) : (
-              <MenuItem icon={<Briefcase />} onSelect={() => toggleProject(true)}>
-                {folder.parentId ? "Move to Home as a project" : "Make it a project"}
-              </MenuItem>
-            )}
+            <MoveToTab type="folder" id={folder.id} current={folder.parentId ? undefined : folder.spaceId} />
             {folder.subfolderCount > 0 && (
-              <MenuItem icon={<LayoutGrid />} onSelect={askToProjects}>Turn subfolders into projects</MenuItem>
+              <MenuItem icon={<LayoutGrid />} onSelect={askToProjects}>Move subfolders to Home</MenuItem>
             )}
             {(folder.bookmarkCount > 0 || folder.subfolderCount > 0) && (
               <MenuItem icon={<FolderOutput />} onSelect={askUnpack}>{unpackLabel}</MenuItem>
@@ -431,6 +449,7 @@ export function BookmarkCard({
               >
                 Move / reorder
               </MenuItem>
+              <MoveToTab type="bookmark" id={bookmark.id} current={bookmark.folderId ? undefined : bookmark.spaceId} />
               <MenuSeparator />
               <MenuItem
                 icon={<Trash2 />}

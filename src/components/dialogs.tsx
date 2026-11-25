@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useSpaces } from "./spaces-context";
 import { toast } from "sonner";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { createBookmark, previewLink, updateBookmark } from "@/app/actions/bookmarks";
@@ -27,6 +28,33 @@ function FolderSelect({ value, onChange, folders, label }: { value: string; onCh
   );
 }
 
+function TabSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const spaces = useSpaces();
+  if (!spaces.length) return null;
+  return (
+    <Field label="Tab">
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputClass}>
+        {spaces.map((s) => (
+          <option key={s.id} value={s.id}>{s.name}</option>
+        ))}
+        <option value="">No tab (All only)</option>
+      </select>
+    </Field>
+  );
+}
+
+/** The Home tab you're looking at (from the URL, else the last one used). */
+function useCurrentTab() {
+  const spaces = useSpaces();
+  const params = useSearchParams();
+  return () => {
+    const fromUrl = params.get("tab");
+    const fromCookie = typeof document !== "undefined" ? document.cookie.match(/(?:^|; )dg_tab=([^;]+)/)?.[1] : undefined;
+    const id = fromUrl ?? fromCookie;
+    return spaces.find((s) => s.id === id)?.id ?? spaces[0]?.id ?? "";
+  };
+}
+
 /* ------------------------------------------------------------------ */
 
 export function NewFolderDialog({
@@ -43,7 +71,8 @@ export function NewFolderDialog({
   const router = useRouter();
   const [name, setName] = useState("");
   const [parent, setParent] = useState(defaultParentId ?? HOME);
-  const [project, setProject] = useState(true);
+  const currentTab = useCurrentTab();
+  const [tab, setTab] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +82,7 @@ export function NewFolderDialog({
     if (open) {
       setName("");
       setParent(defaultParentId ?? HOME);
+      setTab(currentTab());
       setError(null);
     }
   }
@@ -61,7 +91,7 @@ export function NewFolderDialog({
     e.preventDefault();
     setSaving(true);
     const parentId = parent === HOME ? null : parent;
-    const res = await createFolder({ name, parentId, isProject: !parentId && project });
+    const res = await createFolder({ name, parentId, spaceId: parentId ? null : tab || null });
     setSaving(false);
     if (!res.ok) return setError(res.error);
     onOpenChange(false);
@@ -77,12 +107,7 @@ export function NewFolderDialog({
           <input autoFocus required value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="e.g. BOOKREATOR" />
         </Field>
         <FolderSelect label="Inside" value={parent} onChange={setParent} folders={folders} />
-        {parent === HOME && (
-          <label className="flex items-center gap-3 text-sm">
-            <input type="checkbox" checked={project} onChange={(e) => setProject(e.target.checked)} className="h-4.5 w-4.5 accent-[#ffb600]" />
-            Show it under Projects (otherwise Library)
-          </label>
-        )}
+        {parent === HOME && <TabSelect value={tab} onChange={setTab} />}
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
@@ -116,6 +141,8 @@ export function AddBookmarkDialog({
   const [description, setDescription] = useState("");
   const [folderId, setFolderId] = useState(defaultFolderId ?? HOME);
   const [launch, setLaunch] = useState(false);
+  const currentTab = useCurrentTab();
+  const [tab, setTab] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [looking, setLooking] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -130,6 +157,7 @@ export function AddBookmarkDialog({
       setTitle("");
       setDescription("");
       setFolderId(defaultFolderId ?? HOME);
+      setTab(currentTab());
       setLaunch(false);
       setPreview(null);
       setError(null);
@@ -169,6 +197,7 @@ export function AddBookmarkDialog({
       title: title.trim() || preview?.title || "",
       description: description.trim() || preview?.description || "",
       folderId: target,
+      spaceId: target ? null : tab || null,
       launchOnStart: launch,
       favicon: preview?.favicon ?? null,
     });
@@ -228,6 +257,7 @@ export function AddBookmarkDialog({
           <textarea dir="auto" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} className={inputClass} placeholder={preview?.description ?? ""} />
         </Field>
         <FolderSelect label="Save in" value={folderId} onChange={setFolderId} folders={folders} />
+        {folderId === HOME && <TabSelect value={tab} onChange={setTab} />}
         <label className="flex items-center gap-3 text-sm">
           <input type="checkbox" checked={launch} onChange={(e) => setLaunch(e.target.checked)} className="h-4.5 w-4.5 accent-[#ffb600]" />
           Include in this folder&apos;s Launch Workspace

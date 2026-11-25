@@ -310,9 +310,6 @@ export function OrganizeView({ folders, links, focus }: { folders: FolderRow[]; 
                 </button>
                 {isOpen ? <FolderOpen className="h-4 w-4 shrink-0 text-accent" /> : <Folder className="h-4 w-4 shrink-0 text-accent" />}
                 <span dir="auto" className="line-clamp-2 min-w-0 flex-1 break-words py-1.5 text-left text-sm font-semibold leading-snug">{f.name}</span>
-                {key === ROOT && f.isProject && (
-                  <span className="shrink-0 rounded-full bg-accent/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-accent">Project</span>
-                )}
                 {moved && <span className="shrink-0 text-[11px] font-semibold text-accent">Moved</span>}
                 <span className="shrink-0 text-xs text-muted">{count(t, id)}</span>
                 {editable && <RowActions item={{ type: "f", id }} name={f.name} onMove={setMoveDlg} onNudge={nudge} />}

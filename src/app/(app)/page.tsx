@@ -1,23 +1,54 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { FolderTree, Upload } from "lucide-react";
 import { BookmarkGrid, FolderGrid } from "@/components/folder-contents";
 import { EmptyState } from "@/components/empty-state";
-import { buttonClass } from "@/components/ui/button";
-import { getRoot } from "@/lib/data";
-import { requireUser } from "@/lib/session";
-import { getSort, getView } from "@/lib/view";
-import { sortBookmarks, sortFolders } from "@/lib/sort";
+import { SpaceTabs } from "@/components/space-tabs";
 import { SortMenu } from "@/components/sort-menu";
 import { ViewToggle } from "@/components/view-toggle";
+import { buttonClass } from "@/components/ui/button";
+import { getRoot, getSpaces } from "@/lib/data";
+import { requireUser } from "@/lib/session";
+import { sortBookmarks, sortFolders } from "@/lib/sort";
+import { getSort, getView } from "@/lib/view";
+import type { BookmarkView, FolderView } from "@/lib/types";
 
-export default async function Home() {
+function Section({
+  title,
+  folders,
+  bookmarks,
+  view,
+}: {
+  title?: string;
+  folders: FolderView[];
+  bookmarks: BookmarkView[];
+  view: "cards" | "list";
+}) {
+  return (
+    <section className="mt-8 first:mt-6" aria-label={title}>
+      {title && <h2 className="mb-4 text-xl font-bold tracking-tight" dir="auto">{title}</h2>}
+      {folders.length > 0 && <FolderGrid folders={folders} view={view} />}
+      {bookmarks.length > 0 && (
+        <div className={folders.length ? "mt-5" : ""}>
+          <BookmarkGrid bookmarks={bookmarks} view={view} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+export default async function Home({ searchParams }: PageProps<"/">) {
   const user = await requireUser();
-  const [root, view, sort] = await Promise.all([getRoot(user.id), getView(), getSort()]);
-  const projects = sortFolders(root.projects, sort);
-  const library = sortFolders(root.library, sort);
-  const bookmarks = sortBookmarks(root.bookmarks, sort);
+  const [root, spaces, view, sort, sp, jar] = await Promise.all([
+    getRoot(user.id),
+    getSpaces(user.id),
+    getView(),
+    getSort(),
+    searchParams,
+    cookies(),
+  ]);
 
-  if (!projects.length && !library.length && !bookmarks.length) {
+  if (!root.folders.length && !root.bookmarks.length && !spaces.length) {
     return (
       <EmptyState
         title="Let's fill this up"
@@ -32,51 +63,63 @@ export default async function Home() {
     );
   }
 
+  const requested = (typeof sp.tab === "string" ? sp.tab : null) ?? jar.get("dg_tab")?.value ?? "all";
+  const known = new Set(spaces.map((s) => s.id));
+  const active = known.has(requested) ? requested : "all";
+
+  const folders = sortFolders(root.folders, sort);
+  const bookmarks = sortBookmarks(root.bookmarks, sort);
+  const inSpace = (id: string | null) => ({
+    folders: folders.filter((f) => (id ? f.spaceId === id : !f.spaceId || !known.has(f.spaceId))),
+    bookmarks: bookmarks.filter((b) => (id ? b.spaceId === id : !b.spaceId || !known.has(b.spaceId))),
+  });
+
+  const counts: Record<string, number> = { all: folders.length + bookmarks.length };
+  for (const s of spaces) {
+    const c = inSpace(s.id);
+    counts[s.id] = c.folders.length + c.bookmarks.length;
+  }
+  const current = active === "all" ? null : spaces.find((s) => s.id === active)!;
+  const shown = current ? inSpace(current.id) : null;
+  const loose = inSpace(null);
+
   return (
     <>
-      <section aria-labelledby="projects-h">
-        <div className="flex items-start justify-between gap-4">
-          <h1 id="projects-h" className="text-3xl font-bold tracking-tight sm:text-4xl">Projects</h1>
-          <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SpaceTabs spaces={spaces} active={active} counts={counts} />
+        <div className="flex items-center gap-2">
           <SortMenu sort={sort} />
           <ViewToggle view={view} />
           <Link href="/organize" className={buttonClass("secondary", "md")}>
             <FolderTree className="h-4.5 w-4.5" />
-            Organize
+            <span className="hidden sm:inline">Organize</span>
           </Link>
-          </div>
         </div>
-        <p className="mt-1 text-sm text-muted">
-          {projects.length
-            ? `${projects.length} ${projects.length === 1 ? "project" : "projects"}`
-            : "No projects yet. Open a folder's ⋯ menu and choose “Make it a project”."}
-        </p>
-        {projects.length > 0 && (
+      </div>
+
+      {current && shown ? (
+        shown.folders.length || shown.bookmarks.length ? (
+          <Section folders={shown.folders} bookmarks={shown.bookmarks} view={view} />
+        ) : (
           <div className="mt-8">
-            <FolderGrid folders={projects} view={view} />
+            <EmptyState
+              title={`Nothing in “${current.name}” yet`}
+              text="Create a folder while this tab is open, or move one here from its ⋯ menu → Move to tab."
+            />
           </div>
-        )}
-      </section>
-
-      {library.length > 0 && (
-        <section className="mt-14" aria-labelledby="library-h">
-          <h2 id="library-h" className="text-2xl font-bold tracking-tight">Library</h2>
-          <p className="mt-1 text-sm text-muted">
-            {library.length} {library.length === 1 ? "folder" : "folders"}
-          </p>
-          <div className="mt-6">
-            <FolderGrid folders={library} view={view} />
-          </div>
-        </section>
-      )}
-
-      {bookmarks.length > 0 && (
-        <section className="mt-14" aria-labelledby="root-links">
-          <h2 id="root-links" className="text-2xl font-bold tracking-tight">Links</h2>
-          <div className="mt-6">
-            <BookmarkGrid bookmarks={bookmarks} view={view} />
-          </div>
-        </section>
+        )
+      ) : (
+        <>
+          {spaces.map((s) => {
+            const c = inSpace(s.id);
+            return c.folders.length || c.bookmarks.length ? (
+              <Section key={s.id} title={s.name} folders={c.folders} bookmarks={c.bookmarks} view={view} />
+            ) : null;
+          })}
+          {(loose.folders.length > 0 || loose.bookmarks.length > 0) && (
+            <Section title="Not in a tab" folders={loose.folders} bookmarks={loose.bookmarks} view={view} />
+          )}
+        </>
       )}
     </>
   );

@@ -8,6 +8,7 @@ export type FolderView = {
   coverUrl: string | null;
   iconUrl: string | null;
   isProject: boolean;
+  spaceId: string | null;
   pinned: boolean;
   bookmarkCount: number;
   launchCount: number;
@@ -27,6 +28,7 @@ export type BookmarkView = {
   description: string | null;
   thumbnailUrl: string | null;
   launchOnStart: boolean;
+  spaceId: string | null;
   updatedAt: Date | string;
   lastLaunchedAt: Date | string | null;
 };
@@ -34,3 +36,5 @@ export type BookmarkView = {
 export type Crumb = { id: string | null; name: string };
 
 export type Sort = "custom" | "az" | "za" | "modified" | "launched";
+
+export type SpaceView = { id: string; name: string };

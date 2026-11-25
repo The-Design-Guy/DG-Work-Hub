@@ -19,6 +19,15 @@ async function ownsFolder(ownerId: string, id: string | null) {
   return !!f;
 }
 
+async function validSpace(ownerId: string, id: string | null) {
+  if (!id) return null;
+  const [s] = await db
+    .select({ id: schema.space.id })
+    .from(schema.space)
+    .where(and(eq(schema.space.id, id), eq(schema.space.ownerId, ownerId)));
+  return s?.id ?? null;
+}
+
 export async function setLaunch(id: string, value: boolean) {
   const user = await requireUser();
   if (!z.uuid().safeParse(id).success) return { ok: false as const };
@@ -62,6 +71,7 @@ const bookmarkInput = z.object({
   title: z.string().max(500),
   description: z.string().max(2000),
   folderId: z.uuid().nullable(),
+  spaceId: z.uuid().nullable().optional(),
   launchOnStart: z.boolean(),
   favicon: z.string().max(16_000).nullable(),
 });
@@ -93,6 +103,7 @@ export async function createBookmark(raw: unknown) {
     .values({
       ownerId: user.id,
       folderId: p.data.folderId,
+      spaceId: p.data.folderId ? null : await validSpace(user.id, p.data.spaceId ?? null),
       title: title.trim() || norm.domain,
       url: norm.url,
       domain: norm.domain,

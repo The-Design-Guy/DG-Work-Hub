@@ -1,14 +1,15 @@
 import { Toaster } from "sonner";
 import { requireUser } from "@/lib/session";
 import { TopBar } from "@/components/top-bar";
-import { getFolderTree, getTopBar } from "@/lib/data";
+import { getFolderTree, getSpaces, getTopBar } from "@/lib/data";
+import { SpacesProvider } from "@/components/spaces-context";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
-  const [folders, topItems] = await Promise.all([getFolderTree(user.id), getTopBar(user.id)]);
+  const [folders, topItems, spaces] = await Promise.all([getFolderTree(user.id), getTopBar(user.id), getSpaces(user.id)]);
 
   return (
-    <>
+    <SpacesProvider spaces={spaces}>
       <TopBar user={{ name: user.name, email: user.email, image: user.image }} items={topItems} folders={folders} />
       <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 pb-24 pt-8 sm:px-8">{children}</main>
       <Toaster
@@ -20,6 +21,6 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           },
         }}
       />
-    </>
+    </SpacesProvider>
   );
 }

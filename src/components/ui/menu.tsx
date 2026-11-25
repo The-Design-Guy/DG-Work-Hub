@@ -58,3 +58,23 @@ export function MenuItem({
 export function MenuSeparator() {
   return <DM.Separator className="my-1 h-px bg-line" />;
 }
+
+export function MenuSub({ label, icon, children }: { label: string; icon?: ReactNode; children: ReactNode }) {
+  return (
+    <DM.Sub>
+      <DM.SubTrigger className="flex cursor-pointer select-none items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-text outline-none data-[highlighted]:bg-surface data-[state=open]:bg-surface">
+        {icon && <span className="text-muted [&>svg]:h-4 [&>svg]:w-4">{icon}</span>}
+        <span className="flex-1">{label}</span>
+        <span aria-hidden className="text-muted">›</span>
+      </DM.SubTrigger>
+      <DM.Portal>
+        <DM.SubContent
+          sideOffset={6}
+          className="z-50 min-w-48 rounded-xl border border-line bg-elevated p-1.5 shadow-2xl shadow-black/50"
+        >
+          {children}
+        </DM.SubContent>
+      </DM.Portal>
+    </DM.Sub>
+  );
+}

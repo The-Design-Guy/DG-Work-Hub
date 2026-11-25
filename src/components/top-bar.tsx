@@ -8,7 +8,8 @@ import type { TopItemView } from "@/lib/data";
 import { TopBarEditor } from "./top-bar-editor";
 import { PinnedFolderMenu } from "./pinned-folder";
 import { useEffect, useRef, useState } from "react";
-import { FolderPlus, Pencil, Plus, Search } from "lucide-react";
+import { FolderPlus, Pencil, Plus } from "lucide-react";
+import { SearchBox } from "./search-box";
 import { Button, buttonClass } from "./ui/button";
 import { NavMenu } from "./nav-menu";
 import { AddBookmarkDialog, NewFolderDialog } from "./dialogs";
@@ -25,7 +26,7 @@ export function TopBar({
   const [editBar, setEditBar] = useState(false);
   const pathname = usePathname();
   const currentFolder = pathname.match(/^\/f\/([0-9a-f-]{36})/i)?.[1] ?? null;
-  const searchRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<{ focus: () => void }>(null);
   const [newFolder, setNewFolder] = useState(false);
   const [addBookmark, setAddBookmark] = useState(false);
 
@@ -74,19 +75,7 @@ export function TopBar({
           </span>
         </Link>
 
-        <div className="relative order-last w-full sm:order-none sm:max-w-xl sm:flex-1">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-muted" aria-hidden />
-          <input
-            ref={searchRef}
-            type="search"
-            placeholder="Search folders and links"
-            aria-label="Search folders and links"
-            className="h-11 w-full rounded-xl border border-line bg-surface pl-10 pr-14 text-sm placeholder:text-muted focus:border-accent focus:outline-none"
-          />
-          <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted sm:block">
-            Ctrl K
-          </kbd>
-        </div>
+        <SearchBox ref={searchRef} />
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <Button variant="secondary" size="md" onClick={() => setNewFolder(true)} aria-label="New folder">

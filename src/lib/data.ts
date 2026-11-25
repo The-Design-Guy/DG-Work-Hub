@@ -18,6 +18,7 @@ function folderSelect(ownerId: string) {
     name: folder.name,
     icon: folder.icon,
     isProject: folder.isProject,
+    spaceId: folder.spaceId,
     pinned: sql<boolean>`exists (select 1 from ${schema.topItem} ti where ti.folder_id = ${outerId} and ti.owner_id = ${ownerId})`,
     coverUrl: sql<string | null>`case when ${folder.coverImageId} is null then null else '/api/images/' || ${folder.coverImageId} end`,
     iconUrl: sql<string | null>`case when ${folder.iconImageId} is null then null else '/api/images/' || ${folder.iconImageId} end`,
@@ -53,6 +54,7 @@ const bookmarkSelect = {
   description: bookmark.description,
   thumbnailUrl: bookmark.thumbnailUrl,
   launchOnStart: bookmark.launchOnStart,
+  spaceId: bookmark.spaceId,
   updatedAt: bookmark.updatedAt,
   lastLaunchedAt: bookmark.lastLaunchedAt,
 };
@@ -87,11 +89,7 @@ async function childBookmarks(ownerId: string, folderId: string | null): Promise
 
 export async function getRoot(ownerId: string) {
   const [folders, bookmarks] = await Promise.all([childFolders(ownerId, null), childBookmarks(ownerId, null)]);
-  return {
-    projects: folders.filter((f) => f.isProject),
-    library: folders.filter((f) => !f.isProject),
-    bookmarks,
-  };
+  return { folders, bookmarks };
 }
 
 export async function getFolder(ownerId: string, id: string) {
@@ -273,4 +271,13 @@ export async function getTopBar(ownerId: string): Promise<TopItemView[]> {
       .map((l) => ({ id: l.id, title: l.title, url: l.url, domain: l.domain, faviconUrl: l.faviconUrl })),
     subfolders: subs.filter((x) => x.parentId === i.folderId).map((x) => ({ id: x.id, name: x.name })),
   }));
+}
+
+/** Home tabs, in order. */
+export async function getSpaces(ownerId: string) {
+  return db
+    .select({ id: schema.space.id, name: schema.space.name })
+    .from(schema.space)
+    .where(eq(schema.space.ownerId, ownerId))
+    .orderBy(asc(schema.space.sortOrder), asc(schema.space.createdAt));
 }

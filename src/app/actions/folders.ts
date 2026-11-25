@@ -81,12 +81,14 @@ export async function unpackFolder(folderId: string) {
   const user = await requireUser();
   if (!z.uuid().safeParse(folderId).success) return { ok: false as const, error: "Folder not found." };
   const [f] = await db
-    .select({ id: folder.id, parentId: folder.parentId })
+    .select({ id: folder.id, parentId: folder.parentId, spaceId: folder.spaceId })
     .from(folder)
     .where(and(eq(folder.id, folderId), eq(folder.ownerId, user.id), isNull(folder.deletedAt)));
   if (!f) return { ok: false as const, error: "Folder not found." };
 
   const target = f.parentId;
+  // Items landing on Home stay in the same tab as the folder they came from.
+  const space = target ? {} : { spaceId: f.spaceId };
   const inTarget = (col: typeof folder.parentId | typeof schema.bookmark.folderId) =>
     target ? sql`${col} = ${target}` : sql`${col} is null`;
   const { bookmark } = schema;
@@ -118,13 +120,13 @@ export async function unpackFolder(folderId: string) {
     ...kidsF.map((k, i) =>
       db
         .update(folder)
-        .set({ parentId: target, sortOrder: fBase + i + 1, updatedAt: now })
+        .set({ parentId: target, sortOrder: fBase + i + 1, updatedAt: now, ...space })
         .where(and(eq(folder.id, k.id), eq(folder.ownerId, user.id))),
     ),
     ...kidsB.map((k, i) =>
       db
         .update(bookmark)
-        .set({ folderId: target, sortOrder: bBase + i + 1, updatedAt: now })
+        .set({ folderId: target, sortOrder: bBase + i + 1, updatedAt: now, ...space })
         .where(and(eq(bookmark.id, k.id), eq(bookmark.ownerId, user.id))),
     ),
     db
@@ -177,7 +179,7 @@ export async function subfoldersToProjects(folderId: string) {
   const { bookmark } = schema;
   if (!z.uuid().safeParse(folderId).success) return { ok: false as const, error: "Folder not found." };
   const [f] = await db
-    .select({ id: folder.id })
+    .select({ id: folder.id, spaceId: folder.spaceId })
     .from(folder)
     .where(and(eq(folder.id, folderId), eq(folder.ownerId, user.id), isNull(folder.deletedAt)));
   if (!f) return { ok: false as const, error: "Folder not found." };
@@ -200,13 +202,13 @@ export async function subfoldersToProjects(folderId: string) {
     ...kidsF.map((k, i) =>
       db
         .update(folder)
-        .set({ parentId: null, isProject: true, sortOrder: base.f + i + 1, updatedAt: now })
+        .set({ parentId: null, isProject: true, spaceId: f.spaceId, sortOrder: base.f + i + 1, updatedAt: now })
         .where(and(eq(folder.id, k.id), eq(folder.ownerId, user.id))),
     ),
     ...kidsB.map((k, i) =>
       db
         .update(bookmark)
-        .set({ folderId: null, sortOrder: base.b + i + 1, updatedAt: now })
+        .set({ folderId: null, spaceId: f.spaceId, sortOrder: base.b + i + 1, updatedAt: now })
         .where(and(eq(bookmark.id, k.id), eq(bookmark.ownerId, user.id))),
     ),
     db
@@ -218,10 +220,19 @@ export async function subfoldersToProjects(folderId: string) {
   return { ok: true as const, projects: kidsF.length, bookmarks: kidsB.length };
 }
 
+async function validSpace(ownerId: string, id: string | null) {
+  if (!id) return null;
+  const [s] = await db
+    .select({ id: schema.space.id })
+    .from(schema.space)
+    .where(and(eq(schema.space.id, id), eq(schema.space.ownerId, ownerId)));
+  return s?.id ?? null;
+}
+
 const folderInput = z.object({
   name: z.string().trim().min(1).max(200),
   parentId: z.uuid().nullable(),
-  isProject: z.boolean(),
+  spaceId: z.uuid().nullable(),
 });
 
 export async function createFolder(raw: unknown) {
@@ -236,7 +247,7 @@ export async function createFolder(raw: unknown) {
     .where(and(eq(folder.ownerId, user.id), parentId ? eq(folder.parentId, parentId) : isNull(folder.parentId)));
   const [row] = await db
     .insert(folder)
-    .values({ ownerId: user.id, parentId, name, isProject: !parentId && p.data.isProject, sortOrder: Number(m?.m ?? 0) + 1 })
+    .values({ ownerId: user.id, parentId, name, spaceId: parentId ? null : await validSpace(user.id, p.data.spaceId), sortOrder: Number(m?.m ?? 0) + 1 })
     .returning({ id: folder.id });
   revalidatePath("/", "layout");
   return { ok: true as const, id: row.id };

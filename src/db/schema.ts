@@ -112,6 +112,21 @@ export const image = pgTable(
   (t) => [index("image_owner_idx").on(t.ownerId)],
 );
 
+/** Home tabs ("spaces"): Personal projects, Clients, etc. Top-level items belong to one. */
+export const space = pgTable(
+  "space",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    sortOrder: doublePrecision("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("space_owner_idx").on(t.ownerId, t.sortOrder)],
+);
+
 export const folder = pgTable(
   "folder",
   {
@@ -124,8 +139,10 @@ export const folder = pgTable(
     }),
     name: text("name").notNull(),
     icon: text("icon"),
-    /** Top-level folders flagged as projects show in Home's "Projects" section. */
+    /** Legacy flag (before tabs). Not used for display anymore. */
     isProject: boolean("is_project").notNull().default(false),
+    /** Home tab of a top-level folder. Null = not in a tab (shows under All). */
+    spaceId: uuid("space_id").references(() => space.id, { onDelete: "set null" }),
     coverImageId: uuid("cover_image_id").references(() => image.id, { onDelete: "set null" }),
     /** Square icon (a site's favicon or an uploaded image, cropped 1:1). */
     iconImageId: uuid("icon_image_id").references(() => image.id, { onDelete: "set null" }),
@@ -154,6 +171,8 @@ export const bookmark = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     folderId: uuid("folder_id").references(() => folder.id, { onDelete: "cascade" }),
+    /** Home tab of a top-level link. Null = not in a tab (shows under All). */
+    spaceId: uuid("space_id").references(() => space.id, { onDelete: "set null" }),
     title: text("title").notNull(),
     url: text("url").notNull(),
     domain: text("domain").notNull(),
